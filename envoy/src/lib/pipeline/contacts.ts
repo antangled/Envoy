@@ -5,6 +5,7 @@ import { TeamPeopleZ, teamPeopleSchema } from "@/lib/llm/schemas";
 import { domainSearch, emailFinder, hunterAvailable, type HunterPerson } from "@/lib/providers/hunter";
 import type { ContactStatus } from "@/db/schema";
 import type { EvidenceRow } from "./evidence";
+import type { ExaPerson } from "@/lib/providers/exa";
 
 export interface ContactDraft {
   name: string | null;
@@ -49,7 +50,7 @@ function statusFromHunter(p: HunterPerson, acceptAll: boolean): ContactStatus {
   return "unknown";
 }
 
-export async function findContacts(args: { domain: string; roles: string[]; evidence: EvidenceRow[]; website: string }): Promise<ContactDraft[]> {
+export async function findContacts(args: { domain: string; roles: string[]; evidence: EvidenceRow[]; website: string; exaPeople?: ExaPerson[] }): Promise<ContactDraft[]> {
   const { domain, roles, evidence } = args;
   const out: ContactDraft[] = [];
 
@@ -80,6 +81,31 @@ export async function findContacts(args: { domain: string; roles: string[]; evid
     } catch (e) {
       console.warn("hunter domain search failed", domain, e);
     }
+  }
+
+  // A2. People Exa confirmed in the target roles. Hunter supplies the email when its key is set.
+  const sameName = (a: string | null, b: string) => !!a && a.toLowerCase().replace(/[^a-z]/g, "") === b.toLowerCase().replace(/[^a-z]/g, "");
+  for (const p of args.exaPeople ?? []) {
+    const existing = out.find((c) => sameName(c.name, p.name));
+    if (existing) {
+      existing.linkedinUrl ??= p.linkedinUrl;
+      existing.title ??= p.jobTitle;
+      continue;
+    }
+    const [first, ...rest] = p.name.split(/\s+/);
+    const last = rest.at(-1) ?? "";
+    let email: string | null = null;
+    let status: ContactStatus = "not_found";
+    let confidence: number | null = null;
+    if (hunterAvailable() && first && last) {
+      const f = await emailFinder(domain, first, last).catch(() => null);
+      if (f?.email) {
+        email = f.email;
+        confidence = f.score;
+        status = f.verification?.status === "valid" ? "verified" : acceptAll || f.accept_all ? "accept_all" : (f.score ?? 0) >= 90 ? "verified" : "unknown";
+      }
+    }
+    out.push({ name: p.name, firstName: first, lastName: last || null, title: p.jobTitle, email, emailStatus: status, confidence, source: email ? "exa+hunter" : "exa", sourceUrl: p.sourceUrl, linkedinUrl: p.linkedinUrl, score: titleScore(p.jobTitle, roles) });
   }
 
   // B. Published contacts on the company's own pages

@@ -13,6 +13,7 @@
     "@electric-sql/pglite": "^0.5.8",
     "@mozilla/readability": "^0.6.0",
     "drizzle-orm": "^0.45.4",
+    "exa-js": "^2.25.0",
     "jose": "^6.2.12",
     "linkedom": "^0.18.13",
     "next": "16.4.0",

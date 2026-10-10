@@ -51,7 +51,7 @@ function ProspectRow({ p, b, active, progress, onClick }: { p: Prospect; b: Bund
           <p className="mt-0.5 flex items-center gap-2 text-[12px] text-ink-2">
             {working && <><span className="working h-1.5 w-1.5 rounded-full bg-link" />{progress?.detail}</>}
             {!working && p.status === "skipped" && <span className="text-bad">{p.skipReason || "Skipped"}</span>}
-            {!working && brief && <><CriteriaDots criteria={brief.data.criteria} />{contact && <ContactBadge status={contact.emailStatus} />}</>}
+            {!working && brief && <><CriteriaDots criteria={brief.data.criteria} />{contact && <ContactBadge status={contact.emailStatus} named={!!contact.name} />}</>}
             {!working && !brief && p.status !== "skipped" && <span>Waiting</span>}
           </p>
         </div>
@@ -155,25 +155,25 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
             const chosen = c.id === draft.contactId;
             return (
               <li key={c.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 ${chosen ? "bg-carbon" : ""}`}>
-                <ContactBadge status={c.emailStatus} />
+                <ContactBadge status={c.emailStatus} named={!!c.name} />
                 <span className="font-semibold">{c.name || (c.emailStatus === "not_found" ? `No named contact. Try: ${c.title}` : "Company address")}</span>
                 {c.title && c.name && <span className="text-[14px] text-ink-2">{c.title}</span>}
                 {c.email && <span className="text-[14px] tabular-nums">{c.email}</span>}
-                {c.sourceUrl && <a className="text-[13px] text-link hover:underline" href={c.sourceUrl} target="_blank" rel="noreferrer">{c.emailStatus === "not_found" ? "Contact page" : "Source"}</a>}
+                {c.sourceUrl && <a className="text-[13px] text-link hover:underline" href={c.sourceUrl} target="_blank" rel="noreferrer">{c.emailStatus === "not_found" && !c.name ? "Contact page" : "Source"}</a>}
                 {c.linkedinUrl && <a className="text-[13px] text-link hover:underline" href={c.linkedinUrl} target="_blank" rel="noreferrer">LinkedIn</a>}
                 {!chosen && c.email && <button className="ml-auto text-[13px] text-link hover:underline" onClick={() => patch({ contactId: c.id }, "contact")}>Write to this person</button>}
               </li>
             );
           })}
         </ul>
-        {contact && <p className="mt-2 text-[13px] text-ink-2">{CONTACT_LABEL[contact.emailStatus].help}</p>}
+        {contact && <p className="mt-2 text-[13px] text-ink-2">{contact.emailStatus === "not_found" && contact.name ? `${contact.name} was found, but no email address for them was. Add your Hunter key to look it up, or find it yourself and edit the draft.` : CONTACT_LABEL[contact.emailStatus].help}</p>}
         {contact?.emailStatus === "published_generic" && (
           <label className="mt-2 flex items-center gap-2 text-[14px]">
             <input type="checkbox" checked={draft.allowGeneric} onChange={(e) => patch({ allowGeneric: e.target.checked }, "generic")} className="h-4 w-4 accent-[var(--ink)]" />
             Send to this shared inbox anyway
           </label>
         )}
-        {!status?.integrations.hunter && <p className="mt-2 text-[12px] text-ink-3">Demo mode: only addresses published on the company&rsquo;s site. Add HUNTER_API_KEY to find named people by title.</p>}
+        {!status?.integrations.hunter && <p className="mt-2 text-[12px] text-ink-3">Demo mode: only addresses published on the company&rsquo;s site. Add your Hunter key in envoy/.env.local to find named people by title.</p>}
       </section>
 
       <section className="rounded-xl border border-rule bg-surface">

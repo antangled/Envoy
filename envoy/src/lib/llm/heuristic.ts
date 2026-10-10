@@ -8,13 +8,16 @@ import type { EvidenceDoc } from "./validate";
 
 const STOP = new Set("the and for with that this from have has are was were will into their they them your our about over more than also which what when where who how its it's been being such only other some most very just across within".split(" "));
 
+/** Site chrome rather than company facts: consent banners, newsletter prompts, navigation, calls to action. */
+const BOILERPLATE = /cookie|privacy|javascript|subscribe|newsletter|©|be the first to|sign up|hear about|learn more|read more|get in touch|contact us|follow us|all rights|terms of|skip to|scroll to|click here|request a demo|book a demo/i;
+
 const words = (s: string) => s.toLowerCase().match(/[a-z][a-z0-9-]{3,}/g)?.filter((w) => !STOP.has(w)) ?? [];
 
 function sentences(doc: EvidenceDoc) {
   return doc.text
     .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 40 && s.length <= 260 && /[a-z]/.test(s) && !/cookie|privacy|javascript|subscribe|©/i.test(s));
+    .filter((s) => s.length >= 40 && s.length <= 260 && /[a-z]/.test(s) && !BOILERPLATE.test(s));
 }
 
 function season(goal: string) {
@@ -134,7 +137,7 @@ export function heuristicBrief(args: {
   return {
     fit_score: Math.min(70, 30 + supported * 10 + (hookS ? 5 : 0)),
     profile: hookS
-      ? `In its own words: "${clause(hookS.s, 30)}." This is a demo draft assembled from ${company}'s site; add an Anthropic API key for an AI-written profile.`
+      ? `In its own words: "${clause(hookS.s, 30)}." This demo profile is assembled from ${company}'s site; add your Anthropic key for an AI-written one.`
       : `Little public information was found for ${company}.`,
     criteria,
     mutual_benefit: [

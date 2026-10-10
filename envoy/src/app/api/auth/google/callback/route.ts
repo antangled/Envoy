@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { decodeJwt } from "jose";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { appUrl } from "@/lib/env";
+import { appUrl, secret } from "@/lib/env";
 import { encrypt } from "@/lib/crypto";
 import { createSession } from "@/lib/session";
 
@@ -22,8 +22,8 @@ export async function GET(req: Request) {
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: secret("GOOGLE_CLIENT_ID")!,
+      client_secret: secret("GOOGLE_CLIENT_SECRET")!,
       redirect_uri: `${appUrl()}/api/auth/google/callback`,
       grant_type: "authorization_code",
     }),

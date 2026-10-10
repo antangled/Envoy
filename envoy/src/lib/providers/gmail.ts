@@ -1,13 +1,14 @@
 import "server-only";
 import crypto from "node:crypto";
+import { secret } from "@/lib/env";
 
 export async function accessTokenFromRefresh(refreshToken: string): Promise<string> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: secret("GOOGLE_CLIENT_ID")!,
+      client_secret: secret("GOOGLE_CLIENT_SECRET")!,
       refresh_token: refreshToken,
       grant_type: "refresh_token",
     }),

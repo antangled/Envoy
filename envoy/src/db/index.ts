@@ -2,6 +2,7 @@ import "server-only";
 import path from "node:path";
 import fs from "node:fs";
 import * as schema from "./schema";
+import { secret } from "@/lib/env";
 
 type DB = import("drizzle-orm/pglite").PgliteDatabase<typeof schema> | import("drizzle-orm/postgres-js").PostgresJsDatabase<typeof schema>;
 
@@ -9,11 +10,12 @@ const g = globalThis as unknown as { __envoyDb?: Promise<DB> };
 
 async function init(): Promise<DB> {
   const migrationsFolder = path.join(process.cwd(), "drizzle");
-  if (process.env.DATABASE_URL) {
+  const dbUrl = secret("DATABASE_URL");
+  if (dbUrl) {
     const { drizzle } = await import("drizzle-orm/postgres-js");
     const { migrate } = await import("drizzle-orm/postgres-js/migrator");
     const postgres = (await import("postgres")).default;
-    const client = postgres(process.env.DATABASE_URL, { prepare: false, max: 5 });
+    const client = postgres(dbUrl, { prepare: false, max: 5 });
     const db = drizzle(client, { schema });
     await migrate(db, { migrationsFolder });
     return db;

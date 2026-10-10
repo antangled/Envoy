@@ -10,6 +10,7 @@ import { forModel, gatherEvidence } from "./evidence";
 import { findContacts, isSendable } from "./contacts";
 import { renderDraft, upsertDraft } from "./draft";
 import type { OrgRow } from "./org";
+import type { ExaPerson } from "@/lib/providers/exa";
 
 type Campaign = typeof schema.campaigns.$inferSelect;
 type Prospect = typeof schema.prospects.$inferSelect;
@@ -50,7 +51,7 @@ async function verify(b: BriefAndSlots, docs: EvidenceDoc[], c: Campaign, log: s
 }
 
 /** Evidence → brief + slots (one call) → validation → verifier → optional escalation → contacts → draft. */
-export async function researchProspect(org: OrgRow, c: Campaign, prospect: Prospect, emit: (e: Progress) => void) {
+export async function researchProspect(org: OrgRow, c: Campaign, prospect: Prospect, emit: (e: Progress) => void, people: Promise<ExaPerson[]> = Promise.resolve([])) {
   let p = prospect;
   const db = await getDb();
   const setStatus = (status: string, skipReason?: string) =>
@@ -114,7 +115,8 @@ export async function researchProspect(org: OrgRow, c: Campaign, prospect: Prosp
 
   emit({ prospectId: p.id, stage: "contacts", detail: "Finding the right person" });
   const roles = [...new Set([...c.rolesSelected, ...brief.recommended_roles])];
-  const found = await findContacts({ domain: p.domain, roles, evidence: rows, website: p.website });
+  const exaPeople = (await people).filter((x) => x.domain === p.domain || x.domain.endsWith("." + p.domain));
+  const found = await findContacts({ domain: p.domain, roles, evidence: rows, website: p.website, exaPeople });
   await db.delete(schema.contacts).where(eq(schema.contacts.prospectId, p.id));
   const inserted = await db
     .insert(schema.contacts)

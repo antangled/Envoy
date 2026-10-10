@@ -114,16 +114,18 @@ export default function SetupPage() {
   if (!loaded) return <p className="text-ink-2">Loading…</p>;
 
   return (
+    <>
     <div className="max-w-[760px]">
       <PageTitle sub="Set this up once. Envoy uses it to write the fixed parts of every email and to decide what to research.">Setup</PageTitle>
 
       <Section id="connections" title="Connections">
         <div className="divide-y divide-rule rounded-lg border border-rule bg-surface">
-          <Conn name="Gmail" on={!!status?.user?.gmailConnected} live="Connected. Envoy sends from your account with send-only permission." off={i?.google ? "Not connected. Sign out and continue with Google to send real email." : "Demo outbox. Messages are recorded here but not delivered. Add Google OAuth credentials to send for real."} />
-          <Conn name="AI research" on={!!i?.anthropic} live="Claude Haiku writes briefs, with Sonnet re-checking any that fail validation." off="Demo drafts. Briefs are assembled by rules from the company's own pages. Add ANTHROPIC_API_KEY for AI briefs." />
-          <Conn name="Company discovery" on={!!i?.exa} live="Exa searches the web for organizations matching your goal." off="Demo list of 14 clean-energy companies. You can also add any company by website. Add EXA_API_KEY to search." />
-          <Conn name="Named contacts" on={!!i?.hunter} live="Hunter finds people by title with email confidence and catch-all checks." off="Only addresses published on company sites. Add HUNTER_API_KEY to find named people." />
+          <Conn name="Gmail" envVar="GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET" keyState={status?.keyStates.google} on={!!status?.user?.gmailConnected} live="Connected. Envoy sends from your account with send-only permission." off={i?.google ? "Not connected. Sign out and continue with Google to send real email." : "Demo outbox. Messages are recorded here but not delivered."} />
+          <Conn name="AI research" envVar="ANTHROPIC_API_KEY" keyState={status?.keyStates.anthropic} on={!!i?.anthropic} live="Claude Haiku writes briefs, with Sonnet re-checking any that fail validation." off="Demo drafts. Briefs are assembled by rules from the company's own pages." />
+          <Conn name="Company discovery" envVar="EXA_API_KEY" keyState={status?.keyStates.exa} on={!!i?.exa} live="Exa searches the web for organizations matching your goal." off="A built-in list of 14 clean-energy companies. You can also add any company by website." />
+          <Conn name="Named contacts" envVar="HUNTER_API_KEY" keyState={status?.keyStates.hunter} on={!!i?.hunter} live="Hunter finds people by title with email confidence and catch-all checks." off="Only addresses published on company sites." />
         </div>
+        {status?.user?.gmailConnected && <TestSend email={status.user.email} />}
       </Section>
 
       <Section title="Your organization" sub="Upload your outreach deck or paste your website and Envoy fills these in. You can also type them.">
@@ -180,12 +182,13 @@ export default function SetupPage() {
         {cap > 50 && <p className="mt-2 text-[13px] text-warn">Above 50 a day raises the chance Gmail limits your account. Only go higher on a Google Workspace account with a sending history.</p>}
       </Section>
 
+    </div>
       <div className="sticky bottom-0 -mx-5 mt-10 flex flex-wrap items-center gap-3 border-t border-rule bg-paper/95 px-5 py-4 backdrop-blur">
         <Button onClick={save} busy={saving}>Save setup</Button>
         {!missing.length && status?.profileComplete && <Button variant="quiet" onClick={() => router.push("/campaigns/new")}>Start a campaign</Button>}
         {missing.length > 0 && <span className="text-[13px] text-ink-2">Still needed: {missing.join(", ")}.</span>}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -206,11 +209,46 @@ function Field({ id, label, hint, value, onChange }: { id: string; label: string
 function Area({ id, label, hint, value, onChange, rows = 2 }: { id: string; label: string; hint?: string; value: string; onChange: (v: string) => void; rows?: number }) {
   return (<div><Label htmlFor={id} hint={hint}>{label}</Label><textarea id={id} rows={rows} className="field resize-y" value={value} onChange={(e) => onChange(e.target.value)} /></div>);
 }
-function Conn({ name, on, live, off }: { name: string; on: boolean; live: string; off: string }) {
+function Conn({ name, on, live, off, envVar, keyState }: { name: string; on: boolean; live: string; off: string; envVar: string; keyState?: "live" | "placeholder" | "missing" }) {
   return (
-    <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:gap-4">
-      <div className="flex w-44 shrink-0 items-center gap-2 font-semibold">{name}</div>
-      <div className="flex-1 text-[14px] text-ink-2"><span className="mr-2 align-middle">{on ? <Badge tone="ok">Live</Badge> : <Badge tone="warn">Demo</Badge>}</span>{on ? live : off}</div>
+    <div className="grid gap-x-5 gap-y-1.5 px-4 py-3.5 sm:grid-cols-[9.5rem_minmax(0,1fr)]">
+      <div className="flex items-start gap-2 sm:flex-col sm:gap-1">
+        <span className="font-semibold">{name}</span>
+        {on ? <Badge tone="ok">Live</Badge> : <Badge tone="warn">Demo</Badge>}
+      </div>
+      <div className="min-w-0 text-[14px] text-ink-2">
+        <p>{on ? live : off}</p>
+        {!on && keyState !== "live" && (
+          <p className="mt-1 text-[13px] text-ink-3">
+            {keyState === "placeholder" ? "Replace the placeholder for " : "Add "}
+            <code className="rounded bg-sunken px-1 py-0.5 text-[12px] text-ink">{envVar}</code> in <code className="rounded bg-sunken px-1 py-0.5 text-[12px] text-ink">envoy/.env.local</code>, then restart the app.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TestSend({ email }: { email: string }) {
+  const [state, setState] = useState<{ busy?: boolean; tone?: "ok" | "bad"; text?: string }>({});
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3">
+      <Button
+        variant="quiet"
+        busy={state.busy}
+        onClick={async () => {
+          setState({ busy: true });
+          try {
+            await api("/api/send/test", { method: "POST" });
+            setState({ tone: "ok", text: `Sent to ${email}. Check your inbox.` });
+          } catch (e) {
+            setState({ tone: "bad", text: (e as Error).message });
+          }
+        }}
+      >
+        Send me a test email
+      </Button>
+      {state.text && <span className={`text-[14px] ${state.tone === "ok" ? "text-ok" : "text-bad"}`}>{state.text}</span>}
     </div>
   );
 }

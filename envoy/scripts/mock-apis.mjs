@@ -60,12 +60,26 @@ function anthropic(body) {
   return message(body.model, {});
 }
 
-const EXA = [
-  { url: "https://lightshiprv.com", title: "Lightship | All-electric RVs", highlights: ["All-electric travel trailers."] },
-  { url: "https://www.antora.com", title: "Antora Energy", highlights: ["Thermal batteries for industry."] },
-  { url: "https://www.linkedin.com/company/x", title: "Should be filtered", highlights: [] },
-  { url: "https://www.silanano.com", title: "Sila - Battery materials", highlights: ["Silicon anode materials."] },
-];
+const runs = new Map();
+function agentResult(body) {
+  const props = body.outputSchema?.properties ?? {};
+  if (props.organizations) {
+    const orgs = [
+      { name: "Lightship", website: "https://lightshiprv.com", reason: "Launched a new commercial product line." },
+      { name: "Antora Energy", website: "https://www.antora.com", reason: "Scaling thermal battery manufacturing." },
+      { name: "A directory that should not appear", website: "https://www.linkedin.com/company/x", reason: "Directory." },
+      { name: "Sila", website: "https://www.silanano.com", reason: "Expanding battery materials production." },
+    ];
+    return { structured: { organizations: orgs }, grounding: orgs.map((o, i) => ({ field: `organizations[${i}].reason`, citations: [{ url: o.website }] })) };
+  }
+  if (props.people) {
+    const names = { "lightshiprv.com": ["Jordan Lee", "VP Operations"], "antora.com": ["Sam Rivera", "Head of Strategy"], "silanano.com": ["Riley Chen", "Head of Strategy"] };
+    const people = (body.input?.data ?? []).flatMap((row) => (names[row.domain] ? [{ domain: row.domain, name: names[row.domain][0], job_title: names[row.domain][1], linkedin_url: `https://www.linkedin.com/in/${names[row.domain][0].toLowerCase().replace(" ", "-")}-example`, source_url: `https://${row.domain}/team` }] : []));
+    return { structured: { people }, grounding: [] };
+  }
+  return { structured: {}, grounding: [] };
+}
+
 
 function hunter(path, q) {
   const domain = q.get("domain");
@@ -85,10 +99,24 @@ http.createServer(async (req, res) => {
   if (req.method === "POST" && url.pathname === "/v1/messages") return send(res, 200, anthropic(await readBody(req)));
   if (req.method === "POST" && url.pathname === "/search") {
     const b = await readBody(req);
-    log.push({ api: "exa", path: "/search", news: !!b.startPublishedDate });
-    return send(res, 200, { results: b.startPublishedDate ? [] : EXA });
+    log.push({ api: "exa", path: "/search", query: b.query, contents: b.contents, category: b.category ?? null, dateFilter: !!b.startPublishedDate });
+    return send(res, 200, { results: [] });
   }
-  if (req.method === "POST" && url.pathname === "/findSimilar") return send(res, 200, { results: [] });
+  if (req.method === "POST" && url.pathname === "/agent/runs") {
+    const b = await readBody(req);
+    const id = `agent_run_mock${runs.size + 1}`;
+    runs.set(id, { body: b, polls: 0 });
+    log.push({ api: "exa", path: "/agent/runs", effort: b.effort, kind: b.outputSchema?.properties?.organizations ? "organizations" : "people", inputRows: b.input?.data?.length ?? 0, exclusions: b.input?.exclusion?.length ?? 0 });
+    return send(res, 200, { id, object: "agent_run", status: "queued" });
+  }
+  if (req.method === "GET" && url.pathname.startsWith("/agent/runs/")) {
+    const id = url.pathname.split("/").pop();
+    const run = runs.get(id);
+    if (!run) return send(res, 404, { error: "unknown run" });
+    run.polls++;
+    if (run.polls < 2) return send(res, 200, { id, status: "running" });
+    return send(res, 200, { id, status: "completed", stopReason: "schema_satisfied", output: { text: "", ...agentResult(run.body) }, costDollars: { total: 0.05 } });
+  }
   if (req.method === "POST" && url.pathname === "/contents") { const b = await readBody(req); log.push({ api: "exa", path: "/contents", n: b.urls?.length }); return send(res, 200, { results: [] }); }
   if (req.method === "GET" && url.pathname.startsWith("/v2/")) return send(res, 200, hunter(url.pathname, url.searchParams));
   send(res, 404, { error: "not mocked", path: url.pathname });

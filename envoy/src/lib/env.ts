@@ -3,12 +3,31 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 
+const PLACEHOLDER = /^(paste|your|replace|placeholder|changeme|change-me|todo|xxx|none|null|undefined)|_here$|^<.*>$/i;
+
+/** Reads a credential from the environment. Empty values and template placeholders (e.g. PASTE_YOUR_KEY_HERE) count as unset. */
+export function secret(name: string): string | undefined {
+  const v = process.env[name]?.trim();
+  return v && !PLACEHOLDER.test(v) ? v : undefined;
+}
+
+/** "placeholder" means the variable exists in .env.local but still holds the template value. */
+const state = (...names: string[]) =>
+  names.every((n) => secret(n)) ? "live" : names.some((n) => process.env[n]?.trim()) ? "placeholder" : "missing";
+
 export const integrations = () => ({
-  anthropic: !!process.env.ANTHROPIC_API_KEY,
-  exa: !!process.env.EXA_API_KEY,
-  hunter: !!process.env.HUNTER_API_KEY,
-  google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
-  database: !!process.env.DATABASE_URL,
+  anthropic: !!secret("ANTHROPIC_API_KEY"),
+  exa: !!secret("EXA_API_KEY"),
+  hunter: !!secret("HUNTER_API_KEY"),
+  google: !!(secret("GOOGLE_CLIENT_ID") && secret("GOOGLE_CLIENT_SECRET")),
+  database: !!secret("DATABASE_URL"),
+});
+
+export const integrationStates = () => ({
+  anthropic: state("ANTHROPIC_API_KEY"),
+  exa: state("EXA_API_KEY"),
+  hunter: state("HUNTER_API_KEY"),
+  google: state("GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"),
 });
 
 export type Integrations = ReturnType<typeof integrations>;

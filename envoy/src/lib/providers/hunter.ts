@@ -1,8 +1,9 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
+import { secret } from "@/lib/env";
 
-export const hunterAvailable = () => !!process.env.HUNTER_API_KEY;
+export const hunterAvailable = () => !!secret("HUNTER_API_KEY");
 
 export interface HunterPerson {
   value: string;
@@ -39,7 +40,7 @@ async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
 }
 
 async function get<T>(path: string, params: Record<string, string>): Promise<T> {
-  const qs = new URLSearchParams({ ...params, api_key: process.env.HUNTER_API_KEY! });
+  const qs = new URLSearchParams({ ...params, api_key: secret("HUNTER_API_KEY")! });
   const res = await fetch(`${process.env.HUNTER_BASE_URL || "https://api.hunter.io"}/v2${path}?${qs}`);
   if (res.status === 404) return { data: null } as T;
   if (!res.ok) throw new Error(`Hunter ${path} failed: ${res.status} ${(await res.text()).slice(0, 200)}`);

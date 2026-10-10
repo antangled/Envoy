@@ -4,7 +4,8 @@ import { handle, requireUser } from "@/lib/session";
 import { ownedCampaign } from "@/lib/pipeline/campaign";
 import { discover } from "@/lib/pipeline/discover";
 
-export const maxDuration = 60;
+// Discovery is an Exa Agent run that is polled to completion; allow up to five minutes.
+export const maxDuration = 300;
 
 export const POST = handle(async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
   const u = await requireUser();

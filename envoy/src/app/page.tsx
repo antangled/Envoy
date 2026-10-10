@@ -26,22 +26,20 @@ function Landing() {
   return (
     <div className="grid items-start gap-12 pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)]">
       <div className="max-w-[560px]">
-        <h1 className="font-serif text-[44px] font-medium leading-[1.08] tracking-[-0.015em] sm:text-[52px]">
+        <h1 className="font-serif text-[40px] font-medium leading-[1.08] tracking-[-0.015em] sm:text-[48px]">
           Reach the right person with a reason they&rsquo;ll recognize.
         </h1>
         <p className="mt-5 text-[17px] leading-relaxed text-ink-2">
           Describe who you want to work with. Envoy finds organizations that fit, researches each one with sources you can click, finds the person to write to, and drafts an email in your own words. You review every message and send it from your Gmail.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          {status?.integrations.google ? (
+          {status?.integrations.google && (
             <a href="/api/auth/google" className="inline-flex items-center justify-center rounded-lg bg-ink px-4 py-2 text-[14px] font-semibold text-paper hover:opacity-90">
               Continue with Google
             </a>
-          ) : (
-            <Button disabled>Continue with Google</Button>
           )}
           <Button
-            variant="quiet"
+            variant={status?.integrations.google ? "quiet" : "primary"}
             busy={busy}
             onClick={async () => {
               setBusy(true);
@@ -53,15 +51,18 @@ function Landing() {
           </Button>
         </div>
         <p className="mt-3 text-[13px] text-ink-3">
-          Envoy asks only for permission to send. It can&rsquo;t read your inbox.
-          {status && !status.integrations.google && " Google sign-in activates once OAuth credentials are added."}
+          {status && !status.integrations.google ? (
+            <>Google sign-in turns on when you add your Google client ID and secret to <code className="text-[12px]">envoy/.env.local</code>. Envoy only ever asks for permission to send; it can&rsquo;t read your inbox.</>
+          ) : (
+            <>Envoy asks only for permission to send. It can&rsquo;t read your inbox.</>
+          )}
         </p>
         {err && (
           <div className="mt-6">
             <Notice tone="bad">{ERRORS[err] ?? `Sign-in failed: ${err}`}</Notice>
           </div>
         )}
-        <ul className="mt-12 grid gap-5 border-t border-rule pt-8 text-[14px] text-ink-2 sm:grid-cols-3">
+        <ul className="mt-12 grid gap-5 border-t border-rule pt-8 text-[14px] text-ink-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
           <li><span className="block font-semibold text-ink">Sourced, not guessed</span>Every claim links to the page it came from. Unknowns are listed, not filled in.</li>
           <li><span className="block font-semibold text-ink">Your template</span>Your intro, credentials, and ask stay word for word. Only the opening and ideas are written per company.</li>
           <li><span className="block font-semibold text-ink">Sent like a person</span>From your Gmail, one at a time, a few minutes apart, 30 a day by default.</li>

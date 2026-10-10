@@ -1,7 +1,7 @@
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { exaAvailable, findSimilar, searchCompanies, type Candidate } from "@/lib/providers/exa";
+import { exaAvailable, findOrganizations, type Candidate } from "@/lib/providers/exa";
 import { normalizeDomain } from "@/lib/providers/fetchPage";
 import { DEMO_COMPANIES } from "./demoCompanies";
 
@@ -16,15 +16,20 @@ export async function discover(c: Campaign): Promise<{ added: number; source: "e
   let candidates: Candidate[] = [];
   let source: "exa" | "demo" = "exa";
   if (exaAvailable()) {
-    const query = [spec.target_description, spec.geography, spec.size_hint].filter(Boolean).join(". ");
-    candidates = await searchCompanies(query, Math.min(40, c.contactCount + 10));
-    for (const seed of spec.seed_examples.slice(0, 2)) {
-      const url = seed.includes(".") ? (seed.startsWith("http") ? seed : `https://${seed}`) : null;
-      if (url) candidates.push(...(await findSimilar(url, 10).catch(() => [])));
-    }
+    const [org] = await db.select().from(schema.orgProfiles).where(eq(schema.orgProfiles.userId, c.userId));
+    candidates = await findOrganizations({
+      goal: c.goalText,
+      description: spec.target_description,
+      geography: spec.geography,
+      sizeHint: spec.size_hint,
+      seeds: spec.seed_examples.slice(0, 3),
+      count: Math.min(30, c.contactCount + 5),
+      exclude: [...excl].filter((v) => !v.includes("@")),
+      ownOrg: org?.orgName ?? "",
+    });
   } else {
     source = "demo";
-    candidates = DEMO_COMPANIES.map((d) => ({ ...d, website: `https://${d.domain}`, reason: "From the built-in demo list. Add EXA_API_KEY to search the web for companies matching your goal." }));
+    candidates = DEMO_COMPANIES.map((d) => ({ ...d, website: `https://${d.domain}`, reason: "", reasonUrl: null }));
   }
   const seen = new Set<string>();
   const rows: (typeof schema.prospects.$inferInsert)[] = [];
@@ -37,7 +42,7 @@ export async function discover(c: Campaign): Promise<{ added: number; source: "e
       excluded++;
       continue;
     }
-    rows.push({ campaignId: c.id, name: cand.name, domain, website: `https://${domain}`, reason: cand.reason, source, selected: rows.length < c.contactCount });
+    rows.push({ campaignId: c.id, name: cand.name, domain, website: `https://${domain}`, reason: cand.reason, reasonUrl: cand.reasonUrl, source, selected: rows.length < c.contactCount });
     if (rows.length >= c.contactCount + 5) break;
   }
   if (rows.length) await db.insert(schema.prospects).values(rows).onConflictDoNothing();

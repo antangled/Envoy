@@ -5,6 +5,7 @@ import { requireUser, HttpError } from "@/lib/session";
 import { ownedCampaign } from "@/lib/pipeline/campaign";
 import { getOrg } from "@/lib/pipeline/org";
 import { researchProspect, updateShortfall, type Progress } from "@/lib/pipeline/research";
+import { exaAvailable, findPeople } from "@/lib/providers/exa";
 
 export const maxDuration = 300;
 
@@ -32,12 +33,19 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     async start(controller) {
       const emit = (e: Progress | Record<string, unknown>) => controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
       emit({ stage: "start", total: targets.length });
+      // One Exa Agent run finds people at every company while pages are being read; a failure just means no Exa names.
+      const people = exaAvailable()
+        ? findPeople(targets.map((p) => ({ name: p.name, domain: p.domain })), c.rolesSelected).catch((e) => {
+            console.error("exa people run failed", e);
+            return [];
+          })
+        : Promise.resolve([]);
       const limit = pLimit(5);
       await Promise.all(
         targets.map((p) =>
           limit(async () => {
             try {
-              await researchProspect(org!, c, p, emit);
+              await researchProspect(org!, c, p, emit, people);
             } catch (e) {
               const msg = e instanceof Error ? e.message : String(e);
               console.error("research failed", p.domain, e);

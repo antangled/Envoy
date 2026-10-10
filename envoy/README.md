@@ -17,7 +17,7 @@ With no keys, Envoy runs in **demo mode**: company pages and published addresses
 | Key | Turns on | Free tier |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | AI briefs, criteria, deck reading (Haiku 5.5; Sonnet 5.5 re-checks failures) | — (~$0.002 per company) |
-| `EXA_API_KEY` | Web search for companies matching the goal | $10/month credit |
+| `EXA_API_KEY` | Finds companies matching the goal and the people in your target roles (two Exa Agent runs per campaign at `low` effort), plus recent news per company | $10/month credit |
 | `HUNTER_API_KEY` | Named people by title, email confidence, catch-all checks | 50 credits/month |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Sign in with Google and send from Gmail (`gmail.send` only) | free |
 

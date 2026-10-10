@@ -36,7 +36,7 @@ export function TargetsStep({ b, reload, onResearch }: { b: Bundle; reload: () =
           <h2 className="font-serif text-[22px] font-medium">Organizations</h2>
           <span className="text-[13px] text-ink-2 tabular-nums">{selected.length} selected of {b.prospects.length}</span>
         </div>
-        {demoList && <div className="mb-4"><Notice tone="warn">Demo mode: these come from a built-in list of clean-energy companies, not a search of your goal. Add any company by website below, or add EXA_API_KEY to search the web.</Notice></div>}
+        {demoList && <div className="mb-4"><Notice tone="warn">Demo mode: these come from a built-in list of clean-energy companies, not a search of your goal. Add any company by website below. To search the web for your goal, add your Exa key in <code className="text-[13px]">envoy/.env.local</code>.</Notice></div>}
         {c.shortfall.length > 0 && <div className="mb-4"><Notice>{c.shortfall.join(" ")}</Notice></div>}
         <ul className="divide-y divide-rule rounded-xl border border-rule bg-surface">
           {b.prospects.map((p) => (
@@ -46,7 +46,12 @@ export function TargetsStep({ b, reload, onResearch }: { b: Bundle; reload: () =
                 <span className="font-semibold">{p.name}</span>{" "}
                 <a href={p.website} target="_blank" rel="noreferrer" className="text-[13px] text-link hover:underline" onClick={(e) => e.stopPropagation()}>{p.domain}</a>
                 {p.source === "manual" && <span className="ml-2"><Badge>Added by you</Badge></span>}
-                {p.reason && p.source !== "demo" && p.source !== "manual" && <span className="mt-0.5 block text-[13px] text-ink-2">{p.reason}</span>}
+                {p.reason && p.source !== "demo" && p.source !== "manual" && (
+                  <span className="mt-0.5 block text-[13px] text-ink-2">
+                    {p.reason}
+                    {p.reasonUrl && <> <a href={p.reasonUrl} target="_blank" rel="noreferrer" className="text-link hover:underline" onClick={(e) => e.stopPropagation()}>Source</a></>}
+                  </span>
+                )}
               </label>
             </li>
           ))}
@@ -97,11 +102,16 @@ export function TargetsStep({ b, reload, onResearch }: { b: Bundle; reload: () =
               <li key={x.id} className="group flex items-start gap-2 text-[14px]">
                 <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-ink-3" />
                 <span className="flex-1">{x.text}</span>
-                {criteria.length > 1 && <button type="button" onClick={() => removeCriterion(x.id)} className="text-[12px] text-ink-3 opacity-0 hover:text-bad group-hover:opacity-100 focus:opacity-100">Remove</button>}
+                {criteria.length > 1 && (
+                  <button type="button" onClick={() => removeCriterion(x.id)} aria-label={`Remove criterion: ${x.text}`} title="Remove"
+                    className="-mr-1 grid h-6 w-6 shrink-0 place-items-center rounded text-[16px] leading-none text-ink-3 opacity-0 hover:bg-sunken hover:text-bad focus:opacity-100 group-hover:opacity-100">
+                    ×
+                  </button>
+                )}
               </li>
             ))}
           </ul>
-          {c.specSource === "demo" && <p className="mt-3 text-[12px] text-ink-3">Demo mode: general criteria for this campaign type. With an AI key they&rsquo;re written from your goal.</p>}
+          {c.specSource === "demo" && <p className="mt-3 text-[12px] text-ink-3">Demo mode: general criteria for this campaign type. With your Anthropic key added, they&rsquo;re written from your goal.</p>}
         </div>
         <div className="border-t border-rule pt-6">
           <Button

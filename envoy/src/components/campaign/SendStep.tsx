@@ -63,11 +63,13 @@ export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void>
             <h2 className="mb-3 font-serif text-[22px] font-medium">Ready to send</h2>
             <ul className="divide-y divide-rule rounded-xl border border-rule bg-surface">
               {pending.map(({ d, p, c }) => (
-                <li key={d.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-                  <span className="min-w-[140px] font-semibold">{p.name}</span>
-                  <span className="text-[14px] text-ink-2">{c?.name ? `${c.name}, ` : ""}{c?.email}</span>
-                  {c && <ContactBadge status={c.emailStatus} />}
-                  <span className="w-full truncate text-[13px] text-ink-3 sm:ml-auto sm:w-auto sm:max-w-[280px]">{d.subject}</span>
+                <li key={d.id} className="flex items-start gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{p.name}</p>
+                    <p className="break-all text-[14px] text-ink-2">{c?.name ? `${c.name}, ` : ""}{c?.email}</p>
+                    <p className="truncate text-[13px] text-ink-3">{d.subject}</p>
+                  </div>
+                  {c && <span className="shrink-0"><ContactBadge status={c.emailStatus} /></span>}
                 </li>
               ))}
             </ul>
@@ -80,10 +82,12 @@ export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void>
             <h2 className="mb-3 font-serif text-[22px] font-medium">Outbox</h2>
             <ul className="divide-y divide-rule rounded-xl border border-rule bg-surface">
               {b.sends.map((s) => (
-                <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-[14px]">
-                  <span className="min-w-[140px] font-semibold">{s.orgName}</span>
-                  <span className="text-ink-2">{s.toEmail}</span>
-                  <span className="ml-auto flex items-center gap-2 tabular-nums">
+                <li key={s.id} className="flex flex-wrap items-start gap-x-3 gap-y-1 px-4 py-3 text-[14px]">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{s.orgName}</p>
+                    <p className="break-all text-ink-2">{s.toEmail}</p>
+                  </div>
+                  <span className="flex shrink-0 items-center gap-2 tabular-nums">
                     {s.status === "scheduled" && <><span className="working h-1.5 w-1.5 rounded-full bg-seal" /><span className="text-ink-2">{fmt(s.scheduledAt)}</span>
                       <button className="text-[13px] text-link hover:underline" onClick={async () => { await api(`/api/sends/${s.id}`, { method: "PATCH", json: { cancel: true } }); await reload(); }}>Cancel</button></>}
                     {s.status === "sent" && <span className="seal-press inline-flex"><Badge tone="ok">{s.channel === "demo" ? "Recorded" : "Sent"}</Badge></span>}

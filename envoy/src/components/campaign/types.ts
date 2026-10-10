@@ -7,7 +7,7 @@ export interface Campaign {
   id: number; mode: "client" | "partnership"; goalText: string; contactCount: number; attachDeck: boolean;
   searchSpec: SearchSpec | null; rolesSelected: string[]; status: string; shortfall: string[]; specSource: string;
 }
-export interface Prospect { id: number; name: string; domain: string; website: string; reason: string; selected: boolean; status: string; skipReason: string | null; source: string }
+export interface Prospect { id: number; name: string; domain: string; website: string; reason: string; reasonUrl: string | null; selected: boolean; status: string; skipReason: string | null; source: string }
 export interface Brief { id: number; prospectId: number; data: BriefAndSlots; evidenceCount: number; modelUsed: string; validationLog: string[]; sources: Record<string, { url: string; title: string; kind: string } | null> }
 export interface Contact { id: number; prospectId: number; name: string | null; firstName: string | null; title: string | null; email: string | null; emailStatus: ContactStatus; confidence: number | null; source: string; sourceUrl: string | null; linkedinUrl: string | null; isPrimary: boolean }
 export interface Draft { id: number; prospectId: number; contactId: number | null; subject: string; body: string; status: "draft" | "selected" | "rejected"; userEdited: boolean; allowGeneric: boolean }

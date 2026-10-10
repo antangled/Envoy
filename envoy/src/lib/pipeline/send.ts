@@ -9,6 +9,9 @@ import { getOrg } from "./org";
 
 type User = typeof schema.users.$inferSelect;
 
+/** Personal-mail domains are never excluded as a whole; only the individual address is. */
+const FREE_MAIL = new Set(["gmail.com", "googlemail.com", "yahoo.com", "outlook.com", "hotmail.com", "live.com", "msn.com", "icloud.com", "me.com", "aol.com", "proton.me", "protonmail.com", "gmx.com", "zoho.com"]);
+
 function localParts(d: Date, tz: string) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23", weekday: "short", year: "numeric", month: "2-digit", day: "2-digit" })
@@ -127,7 +130,11 @@ export async function processDue(userId?: number) {
         messageId = `demo-${s.id}-${Date.now().toString(36)}`;
       }
       await db.update(schema.sends).set({ status: "sent", sentAt: new Date(), gmailMessageId: messageId, subject: draft.subject }).where(eq(schema.sends.id, s.id));
-      for (const value of [s.toEmail, s.toEmail.split("@")[1]]) {
+      // Exclude the person, their email domain, and the company's website domain (they can differ).
+      const [prospect] = await db.select({ domain: schema.prospects.domain }).from(schema.prospects).where(eq(schema.prospects.id, draft.prospectId));
+      const emailDomain = s.toEmail.split("@")[1];
+      const domains = [FREE_MAIL.has(emailDomain) ? null : emailDomain, prospect?.domain];
+      for (const value of new Set([s.toEmail, ...domains].filter(Boolean) as string[])) {
         await db.insert(schema.exclusions).values({ userId: s.userId, value, source: "sent" }).onConflictDoNothing();
       }
       sent++;

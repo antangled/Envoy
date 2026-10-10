@@ -1,15 +1,22 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { ZodType } from "zod";
+import { secret } from "@/lib/env";
 
 export const MODELS = { fast: "claude-haiku-5-5", strong: "claude-sonnet-5-5" } as const;
 
 let client: Anthropic | null = null;
 // Pin the base URL: the SDK otherwise reads ANTHROPIC_BASE_URL, which developer tools sometimes set for their own use.
 const anthropic = () =>
-  (client ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, baseURL: process.env.ENVOY_ANTHROPIC_BASE_URL || "https://api.anthropic.com", maxRetries: 3 }));
+  (client ??= new Anthropic({
+    apiKey: secret("ANTHROPIC_API_KEY"),
+    baseURL: process.env.ENVOY_ANTHROPIC_BASE_URL || "https://api.anthropic.com",
+    maxRetries: 3,
+    // Keys not scoped to a workspace must name one on every request.
+    defaultHeaders: secret("ANTHROPIC_WORKSPACE_ID") ? { "anthropic-workspace-id": secret("ANTHROPIC_WORKSPACE_ID")! } : undefined,
+  }));
 
-export const llmAvailable = () => !!process.env.ANTHROPIC_API_KEY;
+export const llmAvailable = () => !!secret("ANTHROPIC_API_KEY");
 
 type Content = Anthropic.Messages.ContentBlockParam[];
 

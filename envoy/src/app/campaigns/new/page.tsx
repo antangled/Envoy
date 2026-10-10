@@ -1,8 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Label, Notice, PageTitle } from "@/components/ui";
 import { api } from "@/lib/client/api";
+import { useStatus } from "@/components/status";
 
 const EXAMPLES = {
   client: "We want three fall consulting projects with growth-stage clean-energy hardware companies in the Bay Area that are scaling manufacturing or launching a new product line.",
@@ -20,13 +22,21 @@ export default function NewCampaign() {
   const [extra, setExtra] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [hasDeck, setHasDeck] = useState<boolean | null>(null);
+  const { status } = useStatus();
+  const liveSearch = !!status?.integrations.exa;
+  useEffect(() => {
+    api<{ profile: { hasDeck?: boolean; deckUrl?: string } | null }>("/api/setup")
+      .then((d) => setHasDeck(!!d.profile?.hasDeck))
+      .catch(() => setHasDeck(false));
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr(null);
     try {
-      const { id } = await api<{ id: number }>("/api/campaigns", { method: "POST", json: { mode, goalText: goal, contactCount: count, attachDeck: attach, advanced: { geography: geo, sizeHint: size, extraCriteria: extra } } });
+      const { id } = await api<{ id: number }>("/api/campaigns", { method: "POST", json: { mode, goalText: goal, contactCount: count, attachDeck: attach && hasDeck !== false, advanced: { geography: geo, sizeHint: size, extraCriteria: extra } } });
       await api(`/api/campaigns/${id}/discover`, { method: "POST" });
       router.push(`/campaigns/${id}`);
     } catch (e) {
@@ -64,10 +74,14 @@ export default function NewCampaign() {
         </div>
         <div>
           <span className="mb-1.5 block text-[14px] font-semibold">Your deck</span>
-          <label className="flex items-center gap-2 text-[14px] text-ink-2">
-            <input type="checkbox" checked={attach} onChange={(e) => setAttach(e.target.checked)} className="h-4 w-4 accent-[var(--ink)]" />
-            Attach it to each email
-          </label>
+          {hasDeck === false ? (
+            <p className="text-[14px] text-ink-2">No deck uploaded yet. <Link href="/setup" className="text-link hover:underline">Add one in Setup</Link> to attach it.</p>
+          ) : (
+            <label className="flex items-center gap-2 text-[14px] text-ink-2">
+              <input type="checkbox" checked={attach} onChange={(e) => setAttach(e.target.checked)} className="h-4 w-4 accent-[var(--ink)]" />
+              Attach it to each email
+            </label>
+          )}
         </div>
       </div>
 
@@ -83,7 +97,7 @@ export default function NewCampaign() {
       {err && <div className="mt-6"><Notice tone="bad">{err}</Notice></div>}
       <div className="mt-8 flex items-center gap-3">
         <Button type="submit" busy={busy}>{busy ? "Finding organizations" : "Find organizations"}</Button>
-        <span className="text-[13px] text-ink-3">Nothing is sent until you choose.</span>
+        <span className="text-[13px] text-ink-3">{busy && liveSearch ? "Searching the web. This usually takes under a minute." : "Nothing is sent until you choose."}</span>
       </div>
     </form>
   );

@@ -4,6 +4,7 @@ import { api } from "@/lib/client/api";
 
 export interface Status {
   integrations: { anthropic: boolean; exa: boolean; hunter: boolean; google: boolean; database: boolean };
+  keyStates: Record<"anthropic" | "exa" | "hunter" | "google", "live" | "placeholder" | "missing">;
   user: { id: number; email: string; isDemo: boolean; gmailConnected: boolean; dailyCap: number } | null;
   profileComplete: boolean;
 }

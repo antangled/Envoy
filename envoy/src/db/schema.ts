@@ -57,6 +57,7 @@ export const prospects = pgTable(
     domain: text("domain").notNull(),
     website: text("website").notNull(),
     reason: text("reason").notNull().default(""),
+    reasonUrl: text("reason_url"),
     selected: boolean("selected").notNull().default(true),
     status: text("status").notNull().default("discovered"),
     skipReason: text("skip_reason"),
