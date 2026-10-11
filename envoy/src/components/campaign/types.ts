@@ -15,7 +15,7 @@ export interface Send { id: number; draftId: number; toEmail: string; toName: st
 
 export interface Bundle {
   campaign: Campaign & { usage: { claudeUsd: number; exaUsd: number; hunterLookups: number; sonnetBriefs: number }; peoplePerCompany: number }; prospects: Prospect[]; briefs: Brief[]; contacts: Contact[]; drafts: Draft[]; sends: Send[];
-  org: { signature: Signature; templates: { subject: string } & Record<Mode, string>; deckName: string | null } | null; gmailConnected: boolean; dailyCap: number;
+  org: { signature: Signature; templates: { subject: string } & Record<Mode, string>; deckName: string | null } | null; gmailConnected: boolean; dailyCap: number; isDemo?: boolean;
 }
 
 export const SENDABLE: ContactStatus[] = ["verified", "accept_all", "unknown"];

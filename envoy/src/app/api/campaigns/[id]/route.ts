@@ -10,7 +10,7 @@ export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: str
   const { id } = await ctx.params;
   const bundle = await campaignBundle(u.id, Number(id));
   const org = await getOrg(u.id);
-  return Response.json({ ...bundle, org: org ? { signature: signatureFor(org), templates: templatesFor(org), deckName: org.deckB64 ? org.deckName || "deck.pdf" : null } : null, gmailConnected: !!u.googleRefreshTokenEnc, dailyCap: u.dailyCap });
+  return Response.json({ ...bundle, org: org ? { signature: signatureFor(org), templates: templatesFor(org), deckName: org.deckB64 ? org.deckName || "deck.pdf" : null } : null, gmailConnected: !!u.googleRefreshTokenEnc, dailyCap: u.dailyCap, isDemo: u.isDemo });
 });
 
 const Patch = z.object({

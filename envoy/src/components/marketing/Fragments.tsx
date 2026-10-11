@@ -284,3 +284,52 @@ export function QueueFragment() {
     </Frame>
   );
 }
+
+/** Hero companion: a research run in progress. Each row steps through the real pipeline stages and settles on its result. */
+export function ResearchPanel() {
+  const rows = [
+    { name: EXAMPLE.company, domain: EXAMPLE.domain, done: "Draft ready · 7 people", tone: "ok" as const },
+    { name: "Harbor Cell Works", domain: "harborcell.example", done: "Draft ready · 5 people", tone: "ok" as const },
+    { name: "Lumen Grid", domain: "lumengrid.example", done: "Draft ready · 3 people", tone: "ok" as const },
+    { name: "Tidewater Motors", domain: "tidewater.example", done: "Draft ready · 3 people", tone: "ok" as const },
+    { name: "Solstice Thermal", domain: "solstice.example", done: "Not a fit · outside the Bay Area", tone: "warn" as const },
+  ];
+  return (
+    <div className="overflow-hidden rounded-xl border border-rule bg-surface text-ink shadow-[var(--shadow-lift)]" aria-label="Example: Envoy researching five organizations">
+      <div className="border-b border-rule px-5 pb-4 pt-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-[14px] font-semibold">Researching 5 organizations</p>
+          <p className="text-[12px] text-ink-3">Example</p>
+        </div>
+        <div className="mt-3 h-1 overflow-hidden rounded-full bg-sunken" aria-hidden>
+          <div className="research-bar h-full rounded-full bg-seal" />
+        </div>
+      </div>
+      <ul className="divide-y divide-rule">
+        {rows.map((r, i) => (
+          <li key={r.name} className="flex items-center gap-3 px-5 py-3" style={{ ["--d" as string]: `${700 + i * 450}ms` }}>
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-sunken font-serif text-[13px] text-ink-2" aria-hidden>
+              {r.name.slice(0, 1)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13.5px] font-semibold">{r.name}</p>
+              <p className="truncate text-[12px] text-ink-3">{r.domain}</p>
+            </div>
+            <span className="stage-seq grid shrink-0 text-right text-[12px]">
+              <span className="stage-1 flex items-center justify-end gap-1.5 text-ink-2">
+                <span className="working h-1.5 w-1.5 rounded-full bg-link" aria-hidden />
+                Reading site
+              </span>
+              <span className="stage-2 flex items-center justify-end gap-1.5 text-ink-2">
+                <span className="working h-1.5 w-1.5 rounded-full bg-link" aria-hidden />
+                Writing brief
+              </span>
+              <span className={`stage-3 inline-flex items-center justify-self-end rounded-full px-2 py-0.5 font-semibold ${r.tone === "ok" ? "bg-ok-bg text-ok" : "bg-warn-bg text-warn"}`}>{r.done}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="border-t border-rule px-5 py-3 text-[12px] text-ink-3">Every brief cites the pages it was written from.</p>
+    </div>
+  );
+}

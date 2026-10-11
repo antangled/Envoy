@@ -90,7 +90,7 @@ export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void>
                   <span className="flex shrink-0 items-center gap-2">
                     {s.status === "scheduled" && <><span className="working h-1.5 w-1.5 rounded-full bg-seal" /><span className="text-ink-2">{fmt(s.scheduledAt)}</span>
                       <button className="text-[13px] text-link hover:underline" onClick={async () => { await api(`/api/sends/${s.id}`, { method: "PATCH", json: { cancel: true } }); await reload(); }}>Cancel</button></>}
-                    {s.status === "sent" && <span className="seal-press inline-flex"><Badge tone="ok">{s.channel === "demo" ? "Recorded" : "Sent"}</Badge></span>}
+                    {s.status === "sent" && <span className="seal-press inline-flex"><Badge tone="ok">{s.channel === "demo" && !b.isDemo ? "Recorded" : "Sent"}</Badge></span>}
                     {s.status === "failed" && <Badge tone="bad" title={s.error ?? ""}>Failed</Badge>}
                     {s.status === "skipped" && <Badge title={s.error ?? ""}>Not sent</Badge>}
                   </span>
@@ -107,8 +107,8 @@ export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void>
         <div className="rounded-xl border border-rule bg-surface p-5">
           <h3 className="text-[15px] font-semibold">How these go out</h3>
           <ul className="mt-3 space-y-2 text-[14px] text-ink-2">
-            <li>{live ? "From your Gmail, one message per recipient." : <><span className="font-semibold text-warn">Demo outbox.</span> Messages are recorded here but not delivered. Connect Gmail to send for real.</>}</li>
-            <li>{live ? `Spaced 1 to 3 minutes apart, weekdays 8am to 6pm your time, up to ${b.dailyCap} a day and 10 an hour.` : "Spacing is shortened to a few seconds in demo mode."}</li>
+            <li>{live ? "From your Gmail, one message per recipient." : b.isDemo ? <><span className="font-semibold text-ink">Demo account.</span> Emails are marked sent here, but nothing leaves Envoy. Sign in with Google to send for real.</> : <><span className="font-semibold text-warn">Demo outbox.</span> Messages are recorded here but not delivered. Connect Gmail to send for real.</>}</li>
+            <li>{live ? `Spaced 1 to 3 minutes apart, weekdays 8am to 6pm your time, up to ${b.dailyCap} a day and 10 an hour.` : "Spacing is shortened to a few seconds in the demo. Real sends go 1 to 3 minutes apart."}</li>
             <li>Plain text, no tracking pixels, no rewritten links.</li>
             <li>Anyone who opted out or was already contacted is skipped.</li>
           </ul>
@@ -122,7 +122,7 @@ export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void>
         {err && <Notice tone="bad">{err}</Notice>}
         {result && (
           <Notice tone={result.queued ? "ok" : "warn"}>
-            {result.queued ? `${result.queued} email${result.queued === 1 ? "" : "s"} scheduled.` : "Nothing was scheduled."}
+            {result.queued ? `${result.queued} email${result.queued === 1 ? "" : "s"} ${b.isDemo ? "on the way (demo: nothing is delivered)" : "scheduled"}.` : "Nothing was scheduled."}
             {result.skipped.length > 0 && <span className="mt-1 block">Skipped: {result.skipped.join("; ")}</span>}
           </Notice>
         )}

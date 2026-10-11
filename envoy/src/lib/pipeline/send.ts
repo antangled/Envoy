@@ -47,7 +47,8 @@ export async function queueCampaign(user: User, campaignId: number, tz: string) 
   const drafts = await db.select().from(schema.drafts).where(and(inArray(schema.drafts.prospectId, pIds), eq(schema.drafts.status, "selected")));
   const contacts = await db.select().from(schema.contacts).where(inArray(schema.contacts.prospectId, pIds));
   const already = await db.select().from(schema.sends).where(eq(schema.sends.campaignId, campaignId));
-  const excl = new Set((await db.select().from(schema.exclusions).where(eq(schema.exclusions.userId, user.id))).map((e) => e.value));
+  // The demo account can send to its sample companies again in every campaign.
+  const excl = new Set(user.isDemo ? [] : (await db.select().from(schema.exclusions).where(eq(schema.exclusions.userId, user.id))).map((e) => e.value));
   const supp = new Set((await db.select().from(schema.suppressions).where(eq(schema.suppressions.userId, user.id))).map((e) => e.email));
   const existing = await db.select().from(schema.sends).where(and(eq(schema.sends.userId, user.id), inArray(schema.sends.status, ["scheduled", "sent"])));
 
@@ -90,7 +91,7 @@ export async function queueCampaign(user: User, campaignId: number, tz: string) 
         break;
       }
     } else {
-      cursor = new Date(cursor.getTime() + rand(3, 8) * 1000);
+      cursor = new Date(cursor.getTime() + (user.isDemo ? rand(1.5, 3) : rand(3, 8)) * 1000);
     }
     times.push(cursor.getTime());
     // Personalize the body for this recipient: re-render from the template, or swap the greeting name in a hand-edited draft.

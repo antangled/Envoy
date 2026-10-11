@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Envoy logo transition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+  /*
+    Two-second transition for the pitch recording.
+    0.0–0.5 s  the question holds
+    0.5–1.0 s  the question fades into the Envoy logo
+    1.0–2.0 s  the logo holds
+    Colors match the deck: background #F8F8FA, text #19191E, indigo #232F88.
+  */
+  :root {
+    --bg: #F8F8FA;
+    --ink: #19191E;
+    --indigo: #232F88;
+    --muted: #6B6B78;
+    --rule: #E3E3EA;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: Inter, "Helvetica Neue", Arial, sans-serif; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; overflow: hidden; }
+
+  /* The recording stage is exactly 1920 × 1080; it is scaled down only to fit smaller windows. */
+  .frame { width: calc(1920px * var(--scale, 1)); height: calc(1080px * var(--scale, 1)); position: relative; flex: none; }
+  .stage {
+    position: absolute; top: 0; left: 0;
+    width: 1920px; height: 1080px;
+    transform: scale(var(--scale, 1)); transform-origin: top left;
+    background: var(--bg);
+    overflow: hidden;
+  }
+  .layer { position: absolute; inset: 0; display: grid; place-items: center; }
+  .question {
+    margin: 0;
+    font-size: 72px; font-weight: 500; line-height: 1.15; letter-spacing: -0.02em;
+    color: var(--ink);
+    text-align: center;
+  }
+  .logo { opacity: 0; }
+  .logo img { display: block; width: 760px; height: auto; max-height: 420px; object-fit: contain; }
+
+  .controls {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;
+    font-size: 14px; color: var(--muted);
+  }
+  .controls button, .controls label.btn {
+    font: 500 14px/1 Inter, sans-serif;
+    height: 36px; padding: 0 16px;
+    border-radius: 8px; border: 1px solid var(--rule);
+    background: #fff; color: var(--ink); cursor: pointer;
+    display: inline-flex; align-items: center;
+  }
+  .controls button.primary { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+  .controls button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .controls button:focus-visible, .controls label.btn:focus-within { outline: 2px solid var(--indigo); outline-offset: 2px; }
+  .controls input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  [hidden] { display: none !important; }
+  .hidden-controls .controls { display: none; }
+</style>
+</head>
+<body>
+  <div class="frame" id="frame">
+    <div class="stage" id="stage" aria-label="Recording stage, 1920 by 1080">
+      <div class="layer"><p class="question" id="question">What if this took two or three clicks?</p></div>
+      <div class="layer logo" id="logo"><img id="logoImg" alt="Envoy"></div>
+    </div>
+  </div>
+
+  <div class="controls" id="controls">
+    <button class="primary" id="play" disabled>Play</button>
+    <button id="replay" disabled>Replay</button>
+    <button id="hide">Hide controls</button>
+    <label class="btn" id="pick" hidden>Choose logo PNG<input type="file" id="file" accept="image/png"></label>
+    <span id="status">Loading logo and font…</span>
+  </div>
+
+<script>
+(() => {
+  const LOGO_FILE = "01A.png";         // put the selected 01A logo next to this file
+  const Q_HOLD = 500, FADE = 500, LOGO_HOLD = 1000;
+
+  const $ = (id) => document.getElementById(id);
+  const question = $("question"), logo = $("logo"), img = $("logoImg");
+  const play = $("play"), replay = $("replay"), hide = $("hide"), pick = $("pick"), file = $("file"), status = $("status");
+  let anims = [];
+
+  // Fit the 1920 × 1080 stage inside the window, leaving room for the controls when they are visible.
+  function fit() {
+    const hidden = document.body.classList.contains("hidden-controls");
+    const room = hidden ? 0 : 80;
+    const s = Math.min(1, window.innerWidth / 1920, (window.innerHeight - room) / 1080);
+    document.documentElement.style.setProperty("--scale", s);
+  }
+  window.addEventListener("resize", fit);
+  fit();
+
+  function reset() {
+    anims.forEach((a) => a.cancel());
+    anims = [];
+    question.style.opacity = 1;
+    logo.style.opacity = 0;
+  }
+
+  function run() {
+    reset();
+    const timing = { delay: Q_HOLD, duration: FADE, fill: "forwards", easing: "ease-in-out" };
+    anims = [
+      question.animate([{ opacity: 1 }, { opacity: 0 }], timing),
+      logo.animate([{ opacity: 0 }, { opacity: 1 }], timing),
+    ];
+    status.textContent = "Playing…";
+    setTimeout(() => (status.textContent = "Done. The logo holds; press Replay to run it again."), Q_HOLD + FADE + LOGO_HOLD);
+  }
+
+  // The logo must be fully loaded and decoded, and Inter ready, before playback is allowed.
+  async function ready(src) {
+    img.src = src;
+    await img.decode();
+    await document.fonts.load('500 72px "Inter"');
+    await document.fonts.ready;
+    play.disabled = false;
+    replay.disabled = false;
+    pick.hidden = true;
+    status.textContent = "Ready. Press Play, or Space. Press H to hide or show the controls.";
+  }
+
+  ready(LOGO_FILE).catch(() => {
+    pick.hidden = false;
+    status.textContent = `Couldn't load ${LOGO_FILE} next to this file. Choose the logo PNG instead.`;
+  });
+  file.addEventListener("change", () => {
+    const f = file.files && file.files[0];
+    if (!f) return;
+    ready(URL.createObjectURL(f)).catch(() => (status.textContent = "That file couldn't be read as an image."));
+  });
+
+  play.addEventListener("click", run);
+  replay.addEventListener("click", run);
+  const toggle = () => { document.body.classList.toggle("hidden-controls"); fit(); };
+  hide.addEventListener("click", toggle);
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "h" || e.key === "H") toggle();
+    if (e.key === " " && !play.disabled) { e.preventDefault(); run(); }
+  });
+})();
+</script>
+</body>
+</html>

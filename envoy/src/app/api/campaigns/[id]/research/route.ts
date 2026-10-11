@@ -7,6 +7,7 @@ import { getOrg } from "@/lib/pipeline/org";
 import { researchProspect, updateShortfall, type Progress } from "@/lib/pipeline/research";
 import { exaAvailable, findPeople } from "@/lib/providers/exa";
 import { withUsage } from "@/lib/usage";
+import { demoResearch, isScriptedDemo } from "@/lib/demo/run";
 
 export const maxDuration = 300;
 
@@ -34,6 +35,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     start: (controller) => withUsage(c.id, async () => {
       const emit = (e: Progress | Record<string, unknown>) => controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
       emit({ stage: "start", total: targets.length });
+      if (isScriptedDemo(user)) {
+        // Scripted demo: the same progress events, paced like a real run, with no API calls.
+        const lim = pLimit(3);
+        await Promise.all(targets.map((p, i) => lim(() => demoResearch(org!, c, p, emit, (i % 3) * 500))));
+        const shortfall = await updateShortfall(c.id);
+        emit({ stage: "complete", shortfall });
+        return;
+      }
       // One Exa Agent run finds people at every company while pages are being read; a failure just means no Exa names.
       const people = exaAvailable()
         ? findPeople(targets.map((p) => ({ name: p.name, domain: p.domain })), c.rolesSelected, c.peoplePerCompany).catch((e) => {

@@ -31,7 +31,7 @@ node scripts/mock-apis.mjs        # local stand-ins for Anthropic, Exa, Hunter (
 ```
 
 To exercise the live-key code paths without keys, run the mock and start the app with
-`ANTHROPIC_API_KEY=x ENVOY_ANTHROPIC_BASE_URL=http://localhost:4010 EXA_API_KEY=x EXA_BASE_URL=http://localhost:4010 HUNTER_API_KEY=x HUNTER_BASE_URL=http://localhost:4010 ENVOY_DATA_DIR=.data/mocktest`, then run the smoke test against it.
+`ENVOY_DEMO_LIVE=1 ANTHROPIC_API_KEY=x ENVOY_ANTHROPIC_BASE_URL=http://localhost:4010 EXA_API_KEY=x EXA_BASE_URL=http://localhost:4010 HUNTER_API_KEY=x HUNTER_BASE_URL=http://localhost:4010 ENVOY_DATA_DIR=.data/mocktest`, then run the smoke test against it. `ENVOY_DEMO_LIVE=1` makes the demo account use the real pipeline, which the smoke test checks; without it, the demo account runs on scripted sample data.
 
 ## Deploy (Vercel)
 

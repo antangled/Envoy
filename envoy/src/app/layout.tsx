@@ -3,6 +3,7 @@ import { Brygada_1918, Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
 import { StatusProvider } from "@/components/status";
 import { Shell } from "@/components/shell";
+import { THEME_SCRIPT } from "@/components/ThemeToggle";
 
 // Brygada 1918: a revived 1918 book face with letterhead formality, for display type and the letter itself.
 // Schibsted Grotesk: a crisp newspaper grotesk for every interface label, control, and table.
@@ -16,7 +17,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${serif.variable} ${sans.variable}`}>
+    <html lang="en" className={`${serif.variable} ${sans.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body>
         <StatusProvider>
           <Shell>{children}</Shell>

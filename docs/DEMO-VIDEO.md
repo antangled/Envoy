@@ -115,7 +115,8 @@ Read the real number from the screen on the day. Don't round it down.
 
 ## Before recording
 
-1. **Run on real keys** at http://localhost:3000, signed in with the Google account you'll send from. Turn off notifications and close other tabs.
+1. **Pick real or demo data.** For a zero-cost recording, click **Try the demo**: the six sample companies, briefs, source pages, people, and sends are scripted and use no API credits (companies are fictional, which the footer states). For the most convincing proof, record on real keys at http://localhost:3000 signed in with your Google account. Either way, turn off notifications and close other tabs.
+   - The presentation's logo transition is `presentation/logo-transition.html`. Put the 01A logo next to it as `01A.png`, open it in Chrome, press H to hide the controls, and press Space to play.
 2. **Finish Setup.** Fill Your details, run "Write the rest from my website", upload the BEACN logo, and send yourself a test so you know the inbox shot works.
 3. **Pre-run one full campaign** with 5 to 10 companies so the brief in shot 4 is ready. Pick the brief with the clearest citations and a useful "Still unknown" entry.
 4. **Start a second campaign live on camera** for shots 3 and 5, so the loading screen and fresh results are real.

@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useStatus } from "@/components/status";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Notice } from "@/components/ui";
 import { api } from "@/lib/client/api";
-import { BriefFragment, GoalFragment, HeroWindow, OrgsFragment, PeopleFragment, QueueFragment, TemplateFragment } from "./Fragments";
+import { BriefFragment, GoalFragment, HeroWindow, OrgsFragment, PeopleFragment, QueueFragment, ResearchPanel, TemplateFragment } from "./Fragments";
 
 const ERRORS: Record<string, string> = {
   google_not_configured: "Google sign-in isn't configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or try the demo.",
@@ -15,31 +16,44 @@ const ERRORS: Record<string, string> = {
   state_mismatch: "Sign-in expired. Try again.",
 };
 
-/** Sign-in actions, shared by the nav, the hero, and the closing band. */
+/** Sign-in actions, shared by the nav, the hero, and the closing band. Signed-in visitors get a way back into the app. */
 function useSignIn() {
   const { status, refresh } = useStatus();
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const google = !!status?.integrations.google;
+  const signedIn = !!status?.user;
+  const appHref = status?.profileComplete ? "/campaigns" : "/setup";
   const demo = async () => {
     setBusy(true);
     try {
       await api("/api/auth/demo", { method: "POST" });
       await refresh();
+      router.push("/campaigns");
     } finally {
       setBusy(false);
     }
   };
-  return { google, busy, demo };
+  return { google, busy, demo, signedIn, appHref };
 }
 
 const btn = "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-[14.5px] font-semibold transition-colors duration-150 disabled:opacity-60";
 
 function Actions({ onBrand = false }: { onBrand?: boolean }) {
-  const { google, busy, demo } = useSignIn();
+  const { google, busy, demo, signedIn, appHref } = useSignIn();
   const primary = onBrand ? "bg-on-brand text-brand-deep hover:bg-white" : "bg-ink text-canvas hover:bg-ink/88";
   const secondary = onBrand
     ? "border border-on-brand-2/40 text-on-brand hover:bg-on-brand/10"
     : "border border-rule bg-surface text-ink shadow-[0_1px_1px_oklch(0.2_0.03_268/0.05)] hover:border-rule-strong";
+  if (signedIn) {
+    return (
+      <div className="flex flex-wrap items-center gap-3">
+        <Link href={appHref} className={`${btn} ${primary}`}>
+          Open Envoy
+        </Link>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-wrap items-center gap-3">
       {google ? (
@@ -75,7 +89,7 @@ const NAV = [
 ];
 
 function MarketingNav() {
-  const { google, busy, demo } = useSignIn();
+  const { google, busy, demo, signedIn, appHref } = useSignIn();
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 8);
@@ -97,6 +111,13 @@ function MarketingNav() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
+          {signedIn ? (
+            <Link href={appHref} className="inline-flex h-9 items-center rounded-lg bg-ink px-3.5 text-[14px] font-semibold text-canvas transition-colors hover:bg-ink/88">
+              Open Envoy
+            </Link>
+          ) : (
+          <>
           <button type="button" onClick={demo} disabled={busy} className="hidden h-9 rounded-lg px-3 text-[14px] font-medium text-ink-2 transition-colors hover:text-ink sm:block">
             Try the demo
           </button>
@@ -108,6 +129,8 @@ function MarketingNav() {
             <button type="button" onClick={demo} disabled={busy} className="inline-flex h-9 items-center rounded-lg bg-ink px-3.5 text-[14px] font-semibold text-canvas transition-colors hover:bg-ink/88 sm:hidden">
               Try the demo
             </button>
+          )}
+          </>
           )}
         </div>
       </div>
@@ -138,14 +161,8 @@ const RECEIPT = [
 ];
 
 function Landing() {
-  const { status } = useStatus();
-  const router = useRouter();
   const params = useSearchParams();
   const err = params.get("error");
-
-  useEffect(() => {
-    if (status?.user) router.replace(status.profileComplete ? "/campaigns" : "/setup");
-  }, [status, router]);
 
   return (
     <div className="overflow-x-clip">
@@ -154,7 +171,8 @@ function Landing() {
       <main>
         {/* Hero */}
         <section className="relative">
-          <div className="mx-auto max-w-[1200px] px-5 pb-14 pt-14 sm:px-8 sm:pt-20 lg:pt-24">
+          <div className="mx-auto grid max-w-[1200px] items-center gap-12 px-5 pb-14 pt-14 sm:px-8 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-16 lg:pt-20 xl:grid-cols-[minmax(0,1fr)_440px]">
+            <div className="min-w-0">
             <p className="hero-rise mb-6 inline-flex items-center gap-2 rounded-full border border-rule bg-surface px-3 py-1 text-[13px] text-ink-2 shadow-[0_1px_1px_oklch(0.2_0.03_268/0.04)]">
               <span className="h-1.5 w-1.5 rounded-full bg-ok" aria-hidden />
               Sends from your own Gmail. Can&rsquo;t read your inbox.
@@ -172,6 +190,10 @@ function Landing() {
                   <Notice tone="bad">{ERRORS[err] ?? `Sign-in failed: ${err}`}</Notice>
                 </div>
               )}
+            </div>
+            </div>
+            <div className="hero-rise hidden min-w-0 [animation-delay:240ms] lg:block">
+              <ResearchPanel />
             </div>
           </div>
 

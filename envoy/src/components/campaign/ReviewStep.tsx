@@ -15,13 +15,33 @@ export function ReviewStep({ b, reload, progress, running, onContinue }: { b: Bu
   const active = list.find((p) => p.id === activeId) ?? list.find((p) => b.drafts.some((d) => d.prospectId === p.id)) ?? list[0];
   const selectedCount = b.drafts.filter((d) => d.status === "selected").reduce((n, d) => n + recipientsFor(b, d).length, 0);
   const ready = list.filter((p) => b.drafts.some((d) => d.prospectId === p.id)).length;
+  // Drafts that have at least one recipient with an address can be sent; "Select all" toggles every one of them.
+  const sendableDrafts = b.drafts.filter((d) => list.some((p) => p.id === d.prospectId) && recipientsFor(b, d).length > 0);
+  const allDraftsOn = sendableDrafts.length > 0 && sendableDrafts.every((d) => d.status === "selected");
+  const [bulk, setBulk] = useState(false);
+  const selectAllDrafts = async () => {
+    setBulk(true);
+    try {
+      for (const d of sendableDrafts) await api(`/api/drafts/${d.id}`, { method: "PATCH", json: { status: allDraftsOn ? "draft" : "selected" } });
+      await reload();
+    } finally {
+      setBulk(false);
+    }
+  };
 
   return (
     <div>
       {b.campaign.shortfall.length > 0 && !running && <div className="mb-5"><Notice>{b.campaign.shortfall.join(" ")}</Notice></div>}
       <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)]">
         <nav aria-label="Organizations" className="lg:sticky lg:top-6 lg:self-start">
-          <p className="mb-2 text-[13px] text-ink-2 tabular-nums">{running ? `Researching… ${ready} of ${list.length} ready` : `${ready} briefs · ${selectedCount} selected to send`}</p>
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <p className="text-[13px] text-ink-2 tabular-nums">{running ? `Researching… ${ready} of ${list.length} ready` : `${ready} briefs · ${selectedCount} selected to send`}</p>
+            {!running && sendableDrafts.length > 1 && (
+              <button type="button" disabled={bulk} onClick={selectAllDrafts} className="shrink-0 text-[13px] font-semibold text-link hover:underline disabled:opacity-50">
+                {allDraftsOn ? "Clear all" : "Select all"}
+              </button>
+            )}
+          </div>
           <ul className="max-h-[70vh] divide-y divide-rule overflow-auto rounded-xl border border-rule bg-surface">
             {list.map((p) => (
               <ProspectRow key={p.id} p={p} b={b} active={active?.id === p.id} progress={progress[p.id]} onClick={() => setActiveId(p.id)} />
@@ -32,7 +52,7 @@ export function ReviewStep({ b, reload, progress, running, onContinue }: { b: Bu
       </div>
       <div className="sticky bottom-0 -mx-5 mt-8 flex flex-wrap items-center gap-3 border-t border-rule bg-canvas/95 px-5 py-4 backdrop-blur">
         <Button onClick={onContinue} disabled={running || !selectedCount}>Review {selectedCount} email{selectedCount === 1 ? "" : "s"} to send</Button>
-        <span className="text-[13px] text-ink-2">{running ? "You can read briefs as they finish." : "Toggle Send on each draft you want to include."}</span>
+        <span className="text-[13px] text-ink-2">{running ? "You can read briefs as they finish." : "Toggle Send on each draft, or use Select all in the list."}</span>
       </div>
     </div>
   );
@@ -75,6 +95,15 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
   const toggleContact = async (id: number, selected: boolean) => {
     setBusy(`c${id}`);
     try { await api(`/api/contacts/${id}`, { method: "PATCH", json: { selected } }); await reload(); } finally { setBusy(null); }
+  };
+  const selectAllContacts = async (pickable: number[], on: boolean) => {
+    setBusy("all");
+    try {
+      for (const id of pickable) await api(`/api/contacts/${id}`, { method: "PATCH", json: { selected: on } });
+      await reload();
+    } finally {
+      setBusy(null);
+    }
   };
   const findEmail = async (id: number) => {
     setBusy(`e${id}`);
@@ -126,7 +155,7 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
         <div className="text-right">
           <FitScore score={d.fit_score} size="lg" />
           <p className="mt-1 text-[12px] text-ink-3">fit score</p>
-          <p className="mt-2">{brief.modelUsed === "demo-rules" ? <Badge tone="warn">Demo draft</Badge> : <Badge tone="carbon">{brief.modelUsed.includes("sonnet") ? "Checked by Sonnet" : "AI brief"}</Badge>}</p>
+          <p className="mt-2">{brief.modelUsed === "demo-rules" ? <Badge tone="warn">Demo draft</Badge> : brief.modelUsed === "demo-sample" ? <Badge tone="muted" title="Written in advance for the demo. No AI was used.">Sample brief</Badge> : <Badge tone="carbon">{brief.modelUsed.includes("sonnet") ? "Checked by Sonnet" : "AI brief"}</Badge>}</p>
         </div>
       </header>
 
@@ -170,8 +199,18 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
       <section className="rounded-xl border border-rule bg-surface p-5">
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-[15px] font-semibold">Who to write to</h3>
-          <span className="text-[13px] text-ink-2 tabular-nums">
+          <span className="flex items-baseline gap-3 text-[13px] text-ink-2 tabular-nums">
             {contacts.filter((c) => c.name).length} people found · {recipients.length} will get this email
+            {(() => {
+              const pickable = contacts.filter((c) => !!c.email && (c.emailStatus === "published_generic" ? draft.allowGeneric : c.emailStatus !== "not_found")).map((c) => c.id);
+              if (pickable.length < 2) return null;
+              const allOn = pickable.every((id) => recipients.some((r) => r.id === id));
+              return (
+                <button type="button" disabled={busy === "all"} onClick={() => selectAllContacts(pickable, !allOn)} className="font-semibold text-link hover:underline disabled:opacity-50">
+                  {allOn ? "Clear all" : "Select all with email"}
+                </button>
+              );
+            })()}
           </span>
         </div>
         <ul className="divide-y divide-rule rounded-lg border border-rule">
@@ -276,7 +315,7 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
               <span className="w-5 shrink-0 text-right font-semibold text-link tabular-nums">{eid.slice(1)}</span>
               {s ? (
                 <a href={s.url} target="_blank" rel="noreferrer" className="min-w-0 truncate hover:underline">
-                  <span className="text-ink">{s.title || s.url}</span> <span className="text-ink-3">{s.url.replace(/^https?:\/\//, "")}</span>
+                  <span className="text-ink">{s.title || s.url}</span> <span className="text-ink-3">{s.url.replace(/^https?:\/\//, "").replace(/^\/demo\/source\//, "")}</span>
                 </a>
               ) : <span className="text-ink-3">Source no longer available</span>}
             </li>

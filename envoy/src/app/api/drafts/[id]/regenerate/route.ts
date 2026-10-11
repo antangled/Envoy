@@ -8,6 +8,7 @@ import { callStructured, llmAvailable, textDoc } from "@/lib/llm/client";
 import { SLOTS_SYSTEM } from "@/lib/llm/prompts";
 import { SlotsZ, slotsSchema } from "@/lib/llm/schemas";
 import { validateBrief } from "@/lib/llm/validate";
+import { isScriptedDemo } from "@/lib/demo/run";
 
 export const maxDuration = 120;
 
@@ -22,7 +23,8 @@ export const POST = handle(async (_req: Request, ctx: { params: Promise<{ id: st
   const [contact] = draft.contactId ? await db.select().from(schema.contacts).where(eq(schema.contacts.id, draft.contactId)) : [null];
   let data = b.data;
   const log = [...b.validationLog];
-  if (llmAvailable()) {
+  // The demo restores the sample draft instead of calling the model.
+  if (llmAvailable() && !isScriptedDemo(u)) {
     const rows = await db.select().from(schema.evidence);
     const docs = Object.entries(b.evidenceIds)
       .map(([eid, rowId]) => {

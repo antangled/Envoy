@@ -76,7 +76,9 @@ The database is created automatically in `envoy/.data/` on first run (an embedde
 3. Still in Setup: click **Use the BEACN sample** (or upload a deck and click **Read deck and website**), add a postal address, **Save setup**.
 4. **Campaigns → New campaign** → **Use this example** → set organizations to 3 → **Find organizations** (takes up to a minute).
 5. Check the list → **Research 3 organizations** → open each brief, click a few source numbers, read the draft.
-6. **Don't send campaign emails to real companies while testing.** To check real sending, use the **Send me a test email** button in Setup. To try the send step itself, use **Try the demo**, which records sends without delivering them.
+6. **Don't send campaign emails to real companies while testing.** To check real sending, use the **Send me a test email** button in Setup. To try the send step itself, use **Try the demo**.
+
+**The demo account (Try the demo)** runs on scripted sample data in `envoy/src/lib/demo/`. Six fictional companies on `.example` domains with briefs, source pages, people, and drafts. It never calls Claude, Exa, Hunter, or Gmail, so it costs nothing. Each click of Try the demo resets it. Sends are marked Sent but nothing is delivered. Use it for the demo video.
 
 **Automated check (run while the app is running):**
 
@@ -84,7 +86,7 @@ The database is created automatically in `envoy/.data/` on first run (an embedde
 node scripts/smoke.mjs
 ```
 
-It signs into a separate demo account, runs a 3-company campaign, and checks citations, the template, queueing, and sending. "All checks passed" is the goal. Note: with real keys set, it spends a few cents of Claude and Exa credit and a few Hunter lookups.
+It signs into the demo account, runs a 3-company campaign, and checks citations, the template, queueing, and sending. "All checks passed" is the goal. The server must be started with `ENVOY_DEMO_LIVE=1`, otherwise the demo account uses scripted data and the checks fail. With real keys set, it spends a few cents of Claude and Exa credit and a few Hunter lookups, so prefer the mock setup below.
 
 **Without spending credits:** run `node scripts/mock-apis.mjs` in one terminal, then start the app pointed at it (the command is in `envoy/README.md` under "Verify").
 

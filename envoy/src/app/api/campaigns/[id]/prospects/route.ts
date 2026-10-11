@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { HttpError, handle, requireUser } from "@/lib/session";
+import { isScriptedDemo } from "@/lib/demo/run";
 import { ownedCampaign } from "@/lib/pipeline/campaign";
 import { addManualProspect } from "@/lib/pipeline/discover";
 
 export const POST = handle(async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
   const u = await requireUser();
+  if (isScriptedDemo(u)) throw new HttpError(400, "The demo uses six sample companies. Sign in with Google to add your own.");
   const { id } = await ctx.params;
   const c = await ownedCampaign(u.id, Number(id));
   const { website } = z.object({ website: z.string().min(3) }).parse(await req.json());

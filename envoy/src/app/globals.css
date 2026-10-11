@@ -37,8 +37,9 @@
   --shadow-window: 0 1px 2px oklch(0.2 0.05 268 / 0.08), 0 24px 60px -20px oklch(0.15 0.08 268 / 0.45);
   color-scheme: light;
 }
+/* Dark tokens apply when the system is dark and the visitor hasn't chosen light, or when they chose dark. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --canvas: oklch(0.16 0.012 268);
     --surface: oklch(0.2 0.014 268);
     --sunken: oklch(0.18 0.013 268);
@@ -70,6 +71,38 @@
     color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+  --canvas: oklch(0.16 0.012 268);
+  --surface: oklch(0.2 0.014 268);
+  --sunken: oklch(0.18 0.013 268);
+  --ink: oklch(0.94 0.008 268);
+  --ink-2: oklch(0.76 0.015 268);
+  --ink-3: oklch(0.66 0.018 268);
+  --rule: oklch(0.29 0.015 268);
+  --rule-strong: oklch(0.36 0.018 268);
+  --brand: oklch(0.72 0.12 268);
+  --brand-deep: oklch(0.22 0.07 268);
+  --brand-line: oklch(0.32 0.08 268);
+  --on-brand: oklch(0.96 0.01 268);
+  --on-brand-2: oklch(0.78 0.04 268);
+  --seal: oklch(0.72 0.12 268);
+  --seal-hover: oklch(0.78 0.11 268);
+  --on-seal: oklch(0.16 0.012 268);
+  --link: oklch(0.78 0.1 268);
+  --carbon: oklch(0.3 0.06 268);
+  --carbon-line: oklch(0.5 0.1 268);
+  --ok: oklch(0.8 0.11 155);
+  --ok-bg: oklch(0.27 0.045 155);
+  --warn: oklch(0.82 0.11 80);
+  --warn-bg: oklch(0.28 0.045 75);
+  --bad: oklch(0.78 0.12 25);
+  --bad-bg: oklch(0.28 0.05 25);
+  --muted-bg: oklch(0.24 0.014 268);
+  --shadow-lift: 0 1px 1px oklch(0 0 0 / 0.3), 0 8px 24px -8px oklch(0 0 0 / 0.5);
+  --shadow-window: 0 1px 2px oklch(0 0 0 / 0.4), 0 24px 60px -20px oklch(0 0 0 / 0.7);
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 @theme inline {
   --color-canvas: var(--canvas);
@@ -207,4 +240,20 @@ h1, h2, h3 { text-wrap: balance; }
 .hero-source { animation: pop 600ms cubic-bezier(0.22, 1, 0.36, 1) 1700ms both; }
 @media (prefers-reduced-motion: reduce) {
   .hero-rise, .hero-lift, .hero-sweep, .hero-source { animation: none; }
+}
+
+/* Hero research panel: each row steps Reading → Writing → result. The result stays; reduced motion shows it immediately. */
+.stage-seq > * { grid-area: 1 / 1; }
+@keyframes seq-out { to { opacity: 0; } }
+@keyframes seq-mid { 0% { opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes seq-in { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+@keyframes fill { from { width: 0%; } to { width: 100%; } }
+.stage-1 { animation: seq-out 200ms ease-out var(--d) forwards; }
+.stage-2 { opacity: 0; animation: seq-mid 1100ms ease-out var(--d) both; }
+.stage-3 { opacity: 0; animation: seq-in 320ms cubic-bezier(0.22, 1, 0.36, 1) calc(var(--d) + 1100ms) both; }
+.research-bar { width: 100%; animation: fill 3400ms cubic-bezier(0.4, 0, 0.2, 1) 500ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .stage-1, .stage-2 { display: none; }
+  .stage-3 { opacity: 1; animation: none; }
+  .research-bar { animation: none; }
 }

@@ -139,10 +139,13 @@ function Cites({ ids, onCite }: { ids: string[]; onCite?: (eid: string) => void 
   if (!ids.length || !onCite) return null;
   return (
     <>
-      {ids.map((id) => (
-        <button key={id} type="button" className="cite" onClick={() => onCite(id)} aria-label={`Source ${id.slice(1)}`}>
-          {id.slice(1)}
-        </button>
+      {ids.map((id, i) => (
+        <span key={id} className="cite">
+          {i > 0 && <span aria-hidden className="text-ink-3">,</span>}
+          <button type="button" className="text-link hover:underline" onClick={() => onCite(id)} aria-label={`Source ${id.slice(1)}`}>
+            {id.slice(1)}
+          </button>
+        </span>
       ))}
     </>
   );

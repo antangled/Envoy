@@ -5,6 +5,8 @@ import { HttpError, handle, requireUser } from "@/lib/session";
 import { getOrg, profileComplete, templatesFor } from "@/lib/pipeline/org";
 import { unfilledPlaceholders, unknownTokens } from "@/lib/template/render";
 import { buildSpec } from "@/lib/pipeline/spec";
+import { isScriptedDemo } from "@/lib/demo/run";
+import { demoSpec } from "@/lib/demo/fixtures";
 
 export const maxDuration = 60;
 
@@ -51,7 +53,9 @@ export const POST = handle(async (req: Request) => {
   const goal = [body.goalText, body.advanced.geography && `Geography: ${body.advanced.geography}.`, body.advanced.sizeHint && `Company size: ${body.advanced.sizeHint}.`, body.advanced.extraCriteria && `Also must: ${body.advanced.extraCriteria}.`]
     .filter(Boolean)
     .join(" ");
-  const { spec, source } = await buildSpec(goal, body.mode, org!);
+  const { spec, source } = isScriptedDemo(u)
+    ? await new Promise<{ spec: ReturnType<typeof demoSpec>; source: "demo" }>((r) => setTimeout(() => r({ spec: demoSpec(body.mode), source: "demo" }), 1200))
+    : await buildSpec(goal, body.mode, org!);
   const db = await getDb();
   const [c] = await db
     .insert(schema.campaigns)

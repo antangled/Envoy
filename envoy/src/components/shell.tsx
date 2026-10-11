@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useStatus } from "./status";
 import { api } from "@/lib/client/api";
 import { Logo } from "./Logo";
+import { ThemeToggle } from "./ThemeToggle";
 
 const NAV = [
   { href: "/campaigns", label: "Campaigns" },
@@ -21,13 +22,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const demo = i && (!i.anthropic || !i.exa || !i.hunter);
 
   // The signed-out home page is the marketing page and brings its own navigation, full width.
-  if (path === "/") return <>{children}</>;
+  if (path === "/" || path.startsWith("/demo/source/")) return <>{children}</>;
 
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-20 border-b border-rule bg-surface/90 backdrop-blur-md supports-[backdrop-filter]:bg-surface/80">
         <div className="mx-auto flex h-14 max-w-[1180px] items-center gap-x-6 px-5">
-          <Link href={user ? "/campaigns" : "/"} className="flex items-center gap-2.5 rounded-md">
+          <Link href="/" aria-label="Envoy home" className="flex items-center gap-2.5 rounded-md">
             <Logo />
           </Link>
           {user && (
@@ -48,6 +49,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </nav>
           )}
           <div className="ml-auto flex items-center gap-3 text-[13px] text-ink-2">
+            <ThemeToggle />
             {demo && (
               <Link href="/setup#connections" className="rounded-full border border-warn/30 bg-warn-bg px-2.5 py-0.5 font-semibold text-warn" title={`Live: ${live.join(", ") || "none"}`}>
                 Demo mode

@@ -5,12 +5,14 @@ import { ownedContact } from "@/lib/pipeline/contactOwnership";
 import { finderStatus } from "@/lib/pipeline/contacts";
 import { emailFinder, hunterAvailable } from "@/lib/providers/hunter";
 import { withUsage } from "@/lib/usage";
+import { demoFindEmail, isScriptedDemo } from "@/lib/demo/run";
 
 /** Looks up one person's email on demand (one Hunter lookup, charged only when an address is found). */
 export const POST = handle(async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
   const u = await requireUser();
   const { id } = await ctx.params;
   const { contact, prospect, campaign } = await ownedContact(u.id, Number(id));
+  if (isScriptedDemo(u)) return Response.json(await demoFindEmail(contact, prospect));
   if (!hunterAvailable()) throw new HttpError(400, "Email lookup needs the Hunter key.");
   if (!contact.firstName || !contact.lastName) throw new HttpError(400, "A first and last name are needed to look up an email.");
   const f = await withUsage(campaign.id, () => emailFinder(prospect.domain, contact.firstName!, contact.lastName!));

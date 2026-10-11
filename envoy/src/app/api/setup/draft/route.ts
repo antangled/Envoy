@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { HttpError, handle, requireUser } from "@/lib/session";
+import { isScriptedDemo } from "@/lib/demo/run";
 import { callStructured, llmAvailable, pdfDoc, textDoc } from "@/lib/llm/client";
 import { fetchPage } from "@/lib/providers/fetchPage";
 
@@ -59,7 +60,8 @@ function prefill(t: string, me: { name: string; role: string; org: string }) {
 }
 
 export const POST = handle(async (req: Request) => {
-  await requireUser();
+  const u = await requireUser();
+  if (isScriptedDemo(u)) throw new HttpError(400, "Writing from your website uses AI, so it's off in the demo. The sample profile is already filled in.");
   const b = In.parse(await req.json());
   const base = { subject: prefill(b.subject, b.me), client: prefill(b.client, b.me), partnership: prefill(b.partnership, b.me) };
   if (!llmAvailable()) return Response.json({ ...base, orgName: b.me.org, tagline: "", services: [], ai: false });
