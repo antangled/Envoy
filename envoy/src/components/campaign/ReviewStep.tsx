@@ -195,7 +195,7 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
           ) : (
             <Letter b={b} brief={brief} contact={contact} draft={draft} companyName={p.name} onCite={onCite} />
           )}
-          <p className="mt-5 whitespace-pre-line border-t border-dashed border-rule pt-3 text-[12px] text-ink-3">Footer added when sent: your name, organization, postal address, why they&rsquo;re receiving this, and how to opt out.{b.campaign.attachDeck && b.org?.hasDeck ? " Your deck is attached." : ""}</p>
+          
         </div>
         <div className="flex flex-wrap items-center gap-3 border-t border-rule px-5 py-3">
           {editing ? (

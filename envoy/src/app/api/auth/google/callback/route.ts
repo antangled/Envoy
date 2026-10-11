@@ -31,7 +31,7 @@ export async function GET(req: Request) {
   const tok = await res.json();
   if (!res.ok || !tok.id_token) redirect(`/?error=${encodeURIComponent(tok.error || "token_exchange_failed")}`);
   if (!String(tok.scope || "").includes("gmail.send")) redirect("/?error=gmail_permission_not_granted");
-  const { email } = decodeJwt(tok.id_token) as { email?: string };
+  const { email, name } = decodeJwt(tok.id_token) as { email?: string; name?: string };
   if (!email) redirect("/?error=no_email");
 
   const db = await getDb();
@@ -39,9 +39,12 @@ export async function GET(req: Request) {
   let id: number;
   if (existing) {
     id = existing.id;
-    if (tok.refresh_token) await db.update(schema.users).set({ googleRefreshTokenEnc: encrypt(tok.refresh_token) }).where(eq(schema.users.id, id));
+    await db
+      .update(schema.users)
+      .set({ ...(tok.refresh_token ? { googleRefreshTokenEnc: encrypt(tok.refresh_token) } : {}), ...(name ? { name } : {}) })
+      .where(eq(schema.users.id, id));
   } else {
-    const [row] = await db.insert(schema.users).values({ email: email.toLowerCase(), googleRefreshTokenEnc: tok.refresh_token ? encrypt(tok.refresh_token) : null }).returning();
+    const [row] = await db.insert(schema.users).values({ email: email.toLowerCase(), name: name ?? null, googleRefreshTokenEnc: tok.refresh_token ? encrypt(tok.refresh_token) : null }).returning();
     id = row.id;
   }
   await createSession(id);

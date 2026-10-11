@@ -1,7 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import type { RenderInput } from "@/lib/template/render";
+import { DEFAULT_SUBJECT, DEFAULT_TEMPLATES, templateFromLegacy, type Mode, type Signature } from "@/lib/template/render";
 
 export type OrgRow = typeof schema.orgProfiles.$inferSelect;
 
@@ -11,23 +11,30 @@ export async function getOrg(userId: number): Promise<OrgRow | null> {
   return row ?? null;
 }
 
-export function orgForRender(o: OrgRow): RenderInput["org"] {
+export function signatureFor(o: OrgRow | null): Signature {
   return {
-    orgName: o.orgName,
-    oneLiner: o.oneLiner,
-    tagline: o.tagline,
-    teamStructure: o.teamStructure,
-    proofPoints: o.proofPoints,
-    serviceCatalog: o.serviceCatalog,
-    meName: o.meName,
-    meFirstName: o.meFirstName || o.meName.split(" ")[0] || "",
-    meRole: o.meRole,
-    mePronouns: o.mePronouns,
-    postalAddress: o.postalAddress,
-    deckUrl: o.deckUrl,
-    hasDeck: !!o.deckB64,
+    signoff: o?.signoff ?? "Best,",
+    name: o?.meName ?? "",
+    firstName: o?.meFirstName || o?.meName.split(" ")[0] || "",
+    pronouns: o?.mePronouns ?? "",
+    title: o?.meRole ?? "",
+    org: o?.orgName ?? "",
+    tagline: o?.tagline ?? "",
+    website: o?.website ?? "",
+    phone: o?.phone ?? "",
+    postalAddress: o?.postalAddress ?? "",
+    logo: o?.logoDataUri ?? null,
   };
 }
 
-export const profileComplete = (o: OrgRow | null) =>
-  !!o && !!o.orgName && !!o.meName && !!o.meRole && o.serviceCatalog.length > 0;
+/** The user's templates; profiles from before the editor get the default filled from their old fields. */
+export function templatesFor(o: OrgRow | null): { subject: string } & Record<Mode, string> {
+  if (o && (o.templateClient || o.templatePartnership)) {
+    return { subject: o.subjectTemplate || DEFAULT_SUBJECT, client: o.templateClient || DEFAULT_TEMPLATES.client, partnership: o.templatePartnership || DEFAULT_TEMPLATES.partnership };
+  }
+  if (o && o.orgName && o.oneLiner) return templateFromLegacy(o);
+  return { subject: DEFAULT_SUBJECT, ...DEFAULT_TEMPLATES };
+}
+
+/** Setup is done when the signature names a person and an organization; template placeholders are checked per campaign. */
+export const profileComplete = (o: OrgRow | null) => !!o && !!o.orgName && !!o.meName;

@@ -1,102 +1,176 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStatus } from "@/components/status";
-import { Badge, Button, Label, Notice, PageTitle } from "@/components/ui";
+import { Badge, Button, Label, Notice } from "@/components/ui";
+import { TemplateEditor } from "@/components/TemplateEditor";
+import { EmailView } from "@/components/EmailView";
 import { api, fileToBase64 } from "@/lib/client/api";
+import { renderBody, renderSubject, unfilledPlaceholders, unknownTokens, usesAi, type Mode, type Signature } from "@/lib/template/render";
 
 interface Profile {
-  orgName: string; tagline: string; oneLiner: string; whatWeDo: string; proofPoints: string[]; serviceCatalog: string[];
-  teamStructure: string; website: string; deckUrl: string; postalAddress: string; meName: string; meFirstName: string;
-  meRole: string; mePronouns: string; extractedFrom?: string; hasDeck?: boolean; deckName?: string | null;
+  orgName: string; tagline: string; website: string; serviceCatalog: string[];
+  meName: string; mePronouns: string; meRole: string; phone: string; signoff: string; postalAddress: string;
+  subjectTemplate: string; templateClient: string; templatePartnership: string;
+  logo: string | null; deckName: string | null; saved: boolean;
 }
-const EMPTY: Profile = { orgName: "", tagline: "", oneLiner: "", whatWeDo: "", proofPoints: [], serviceCatalog: [], teamStructure: "", website: "", deckUrl: "", postalAddress: "", meName: "", meFirstName: "", meRole: "", mePronouns: "" };
 
-/** Taken from the founder's real outreach email (BEACN → Lightship, Sept 2026). Postal address is left for the user. */
-const SAMPLE: Partial<Profile> = {
+const FREE_MAIL = /@(gmail|googlemail|yahoo|outlook|hotmail|live|msn|icloud|me|aol|proton|protonmail|gmx|zoho)\./i;
+const SAMPLE = { company: "Northwind Robotics", firstName: "Jordan" };
+
+/** Filled from the founder's real outreach email (BEACN → Lightship, Sept 2026). Postal address stays with the user. */
+const BEACN: Partial<Profile> = {
   orgName: "BEACN",
   tagline: "Student-run consulting for environmentally and socially responsible organizations.",
-  oneLiner: "a student-run sustainability consulting group at UC Berkeley",
-  whatWeDo: "Semester-long consulting projects for environmentally and socially responsible organizations.",
-  proofPoints: ["180+ projects for 150+ organizations"],
+  website: "",
   serviceCatalog: ["market sizing", "competitive landscaping", "regulatory research", "supply-chain analysis", "data collection"],
-  teamStructure: "BEACN projects are staffed by seven Berkeley students plus an MBA mentor from Haas",
   meName: "Adam Tang",
-  meFirstName: "Adam",
-  meRole: "Project Manager",
   mePronouns: "he/him/his",
-  extractedFrom: "sample",
+  meRole: "Project Manager",
+  subjectTemplate: "BEACN x {{company}} collaboration?",
+  templateClient: `Dear {{first_name}},
+
+Hope you're doing well! I'm Adam, a Project Manager at BEACN, a student-run sustainability consulting group at UC Berkeley. I saw {{ai_opening}}, and wanted to reach out about potentially supporting that through a semester-long project.
+
+A few ideas that came to mind:
+
+{{ai_ideas}}
+
+To provide some context, BEACN projects are staffed by seven Berkeley students plus an MBA mentor from Haas. Across 180+ projects for 150+ organizations, we've worked on market sizing, competitive landscaping, regulatory research, supply-chain analysis, and data collection. (More info in deck attached)
+
+We're finalizing our fall projects this week, and I'd love to hear what would actually be most useful to {{company}}.
+
+Would this be of interest to you? If so, I'm happy to arrange a time as early as tomorrow; happy to work around your calendar.`,
 };
 
-const lines = (s: string) => s.split("\n");
+/** Shrinks a logo to at most 360px wide so it stays small inside every email. */
+async function logoDataUri(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => {
+      const i = new Image();
+      i.onload = () => res(i);
+      i.onerror = rej;
+      i.src = url;
+    });
+    const scale = Math.min(1, 360 / img.width, 120 / img.height);
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * scale);
+    c.height = Math.round(img.height * scale);
+    c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL("image/png");
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export default function SetupPage() {
   const { status, refresh } = useStatus();
   const router = useRouter();
-  const [p, setP] = useState<Profile>(EMPTY);
-  const [loaded, setLoaded] = useState(false);
+  const [p, setP] = useState<Profile | null>(null);
+  const [saved, setSaved] = useState<string>("");
+  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<Mode>("client");
   const [deck, setDeck] = useState<{ name: string; base64: string } | null>(null);
   const [removeDeck, setRemoveDeck] = useState(false);
   const [exclusions, setExclusions] = useState<{ value: string; source: string }[]>([]);
   const [exclText, setExclText] = useState("");
   const [cap, setCap] = useState(30);
-  const [extracting, setExtracting] = useState(false);
+  const [filling, setFilling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "bad" | "warn"; text: string } | null>(null);
+  const [testSent, setTestSent] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+  /** Keeps the part being edited in view: signature fields scroll the preview to its end, the email back to its top. */
+  const showPreview = (where: "top" | "bottom") => {
+    const el = previewRef.current;
+    if (el) el.scrollTo({ top: where === "top" ? 0 : el.scrollHeight, behavior: "smooth" });
+  };
 
   useEffect(() => {
-    api<{ profile: Profile | null; exclusions: { value: string; source: string }[]; dailyCap: number }>("/api/setup")
+    api<{ profile: Profile; exclusions: { value: string; source: string }[]; dailyCap: number; email: string }>("/api/setup")
       .then((d) => {
-        if (d.profile) setP({ ...EMPTY, ...d.profile });
+        const guess = d.profile.website || (FREE_MAIL.test(d.email) || d.email.endsWith(".local") ? "" : d.email.split("@")[1]);
+        const prof = { ...d.profile, website: guess };
+        setP(prof);
+        setSaved(JSON.stringify(d.profile));
         setExclusions(d.exclusions);
         setCap(d.dailyCap);
-        setLoaded(true);
+        setEmail(d.email);
       })
       .catch(() => router.replace("/"));
   }, [router]);
 
-  const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setP((x) => ({ ...x, [k]: v }));
-  const missing = useMemo(() => {
-    const m: string[] = [];
-    if (!p.orgName) m.push("organization name");
-    if (!p.meName) m.push("your name");
-    if (!p.meRole) m.push("your role");
-    if (!p.serviceCatalog.filter(Boolean).length) m.push("at least one service");
-    return m;
-  }, [p]);
+  const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setP((x) => (x ? { ...x, [k]: v } : x));
+  const templateKey = mode === "client" ? "templateClient" : "templatePartnership";
 
-  async function extract() {
-    setExtracting(true);
+  const sig: Signature | null = useMemo(
+    () =>
+      p && {
+        signoff: p.signoff,
+        name: p.meName,
+        firstName: p.meName.split(" ")[0] ?? "",
+        pronouns: p.mePronouns,
+        title: p.meRole,
+        org: p.orgName,
+        tagline: p.tagline,
+        website: p.website,
+        phone: p.phone,
+        postalAddress: p.postalAddress,
+        logo: p.logo,
+      },
+    [p],
+  );
+
+  if (!p || !sig) return <p className="text-ink-2">Loading…</p>;
+
+  const body = p[templateKey];
+  const unfilled = unfilledPlaceholders(`${p.subjectTemplate}\n${body}`);
+  const unknown = unknownTokens(`${p.subjectTemplate}\n${body}`);
+  const ai = usesAi(body);
+  const dirty = saved !== JSON.stringify({ ...p, website: p.website }) || !!deck || removeDeck || !!exclText;
+  const emailDone = !unfilledPlaceholders(`${p.subjectTemplate}\n${p.templateClient}`).length && !unknown.length;
+  const sigDone = !!(p.meName && p.orgName && p.postalAddress);
+  const gmail = !!status?.user?.gmailConnected;
+
+  async function fill() {
+    if (!p) return;
+    setFilling(true);
     setMsg(null);
     try {
-      const r = await api<{ profile: Record<string, unknown>; source: string }>("/api/setup/extract", { method: "POST", json: { deckB64: deck?.base64 ?? null, website: p.website || null } });
-      const x = r.profile as Record<string, string & string[]>;
-      setP((cur) => ({
-        ...cur,
-        orgName: x.org_name || cur.orgName,
-        tagline: x.tagline || cur.tagline,
-        oneLiner: x.one_liner || cur.oneLiner,
-        whatWeDo: x.what_we_do || cur.whatWeDo,
-        proofPoints: x.proof_points?.length ? x.proof_points : cur.proofPoints,
-        serviceCatalog: x.service_catalog?.length ? x.service_catalog : cur.serviceCatalog,
-        teamStructure: x.team_structure || cur.teamStructure,
-        extractedFrom: r.source,
-      }));
-      setMsg({ tone: "ok", text: "Read your material. Check each field below; whatever you save here is used word for word in every email." });
+      const r = await api<{ subject: string; client: string; partnership: string; orgName: string; tagline: string; services: string[]; ai: boolean }>("/api/setup/draft", {
+        method: "POST",
+        json: { website: p.website || null, deckB64: deck?.base64 ?? null, subject: p.subjectTemplate, client: p.templateClient, partnership: p.templatePartnership, me: { name: p.meName, role: p.meRole, org: p.orgName } },
+      });
+      setP((x) =>
+        x && {
+          ...x,
+          subjectTemplate: r.subject,
+          templateClient: r.client,
+          templatePartnership: r.partnership,
+          orgName: x.orgName || r.orgName,
+          tagline: x.tagline || r.tagline,
+          serviceCatalog: x.serviceCatalog.length ? x.serviceCatalog : r.services,
+        },
+      );
+      const left = unfilledPlaceholders(`${r.subject}\n${r.client}`).length;
+      setMsg({ tone: left ? "warn" : "ok", text: left ? `Filled in what your ${deck ? "deck" : "site"} covers. ${left} placeholder${left === 1 ? "" : "s"} left for you below.` : "Filled in. Read it over, then save." });
     } catch (e) {
-      setMsg({ tone: "warn", text: (e as Error).message });
+      setMsg({ tone: "bad", text: (e as Error).message });
     } finally {
-      setExtracting(false);
+      setFilling(false);
     }
   }
 
   async function save() {
+    if (!p) return;
     setSaving(true);
     setMsg(null);
     try {
-      await api("/api/setup", { method: "PUT", json: { ...p, hasDeck: undefined, deckName: undefined, deck, removeDeck, exclusionsText: exclText, dailyCap: cap } });
+      await api("/api/setup", { method: "PUT", json: { ...p, deck, removeDeck, exclusionsText: exclText, dailyCap: cap } });
       const d = await api<{ profile: Profile; exclusions: { value: string; source: string }[] }>("/api/setup");
-      setP({ ...EMPTY, ...d.profile });
+      setP(d.profile);
+      setSaved(JSON.stringify(d.profile));
       setExclusions(d.exclusions);
       setExclText("");
       setDeck(null);
@@ -110,145 +184,214 @@ export default function SetupPage() {
     }
   }
 
-  const i = status?.integrations;
-  if (!loaded) return <p className="text-ink-2">Loading…</p>;
+  async function sendTest() {
+    if (dirty) await save();
+    setMsg(null);
+    try {
+      await api("/api/send/test", { method: "POST" });
+      setTestSent(true);
+      setMsg({ tone: "ok", text: `Test sent to ${email}. Check your inbox.` });
+    } catch (e) {
+      setMsg({ tone: "bad", text: (e as Error).message });
+    }
+  }
+
+  const ctx = { ...SAMPLE, slots: null };
 
   return (
     <>
-    <div className="max-w-[760px]">
-      <PageTitle sub="Set this up once. Envoy uses it to write the fixed parts of every email and to decide what to research.">Setup</PageTitle>
+      <div className="mb-8">
+        <h1 className="font-serif text-[34px] font-medium leading-tight tracking-[-0.01em]">Your email</h1>
+        <p className="mt-2 max-w-[64ch] text-[15px] text-ink-2">Write it once. For every company, Envoy fills in the name and writes the highlighted parts from that company&rsquo;s own website and news.</p>
+      </div>
 
-      <Section id="connections" title="Connections">
-        <div className="divide-y divide-rule rounded-lg border border-rule bg-surface">
-          <Conn name="Gmail" envVar="GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET" keyState={status?.keyStates.google} on={!!status?.user?.gmailConnected} live="Connected. Envoy sends from your account with send-only permission." off={i?.google ? "Not connected. Sign out and continue with Google to send real email." : "Demo outbox. Messages are recorded here but not delivered."} />
-          <Conn name="AI research" envVar="ANTHROPIC_API_KEY" keyState={status?.keyStates.anthropic} on={!!i?.anthropic} live="Claude Haiku writes briefs, with Sonnet re-checking any that fail validation." off="Demo drafts. Briefs are assembled by rules from the company's own pages." />
-          <Conn name="Company discovery" envVar="EXA_API_KEY" keyState={status?.keyStates.exa} on={!!i?.exa} live="Exa searches the web for organizations matching your goal." off="A built-in list of 14 clean-energy companies. You can also add any company by website." />
-          <Conn name="Named contacts" envVar="HUNTER_API_KEY" keyState={status?.keyStates.hunter} on={!!i?.hunter} live="Hunter finds people by title with email confidence and catch-all checks." off="Only addresses published on company sites." />
+      <ol className="mb-8 grid gap-3 sm:grid-cols-3" aria-label="Setup checklist">
+        <Check done={emailDone} n={1} title="Write your email" detail={emailDone ? "No placeholders left" : `${unfilledPlaceholders(`${p.subjectTemplate}\n${p.templateClient}`).length} placeholders to fill`} />
+        <Check done={sigDone} n={2} title="Add your signature" detail={sigDone ? `${p.meName}, ${p.orgName}` : "Name, organization, postal address"} />
+        <Check done={testSent} n={3} title="Send yourself a test" detail={gmail ? (testSent ? "Sent" : `To ${email}`) : "Sign in with Google first"} action={gmail && !testSent ? <button type="button" className="text-link hover:underline" onClick={sendTest}>Send test</button> : null} />
+      </ol>
+
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
+        <div className="min-w-0 space-y-10">
+          <section aria-labelledby="fill-h" className="rounded-xl border border-rule bg-surface p-5">
+            <h2 id="fill-h" className="text-[16px] font-semibold">Fill it in from your website</h2>
+            <p className="mt-1 text-[14px] text-ink-2">Envoy reads your site, or your deck, and replaces the yellow placeholders. You can edit everything after.</p>
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <div className="min-w-[220px] flex-1">
+                <Label htmlFor="website">Website</Label>
+                <input id="website" className="field" placeholder="yourorg.com" value={p.website} onChange={(e) => set("website", e.target.value)} />
+              </div>
+              <Button onClick={fill} busy={filling} disabled={!p.website && !deck}>{filling ? "Reading" : "Fill in my email"}</Button>
+            </div>
+            <p className="mt-3 text-[13px] text-ink-3">
+              No website? Upload your deck below and click Fill in. Or{" "}
+              <button type="button" className="text-link hover:underline" onClick={() => { setP((x) => x && { ...x, ...BEACN, website: x.website }); setMsg({ tone: "warn", text: "Loaded the BEACN example. Add a postal address, then save." }); }}>
+                start from the BEACN example
+              </button>
+              .
+            </p>
+            {msg && <div className="mt-4"><Notice tone={msg.tone}>{msg.text}</Notice></div>}
+          </section>
+
+          <section aria-labelledby="email-h" onFocus={() => showPreview("top")}>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <h2 id="email-h" className="font-serif text-[22px] font-medium">The email</h2>
+              <div className="inline-flex rounded-lg border border-rule bg-surface p-1" role="tablist" aria-label="Which email">
+                {(["client", "partnership"] as const).map((m) => (
+                  <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1 text-[13px] font-semibold ${mode === m ? "bg-ink text-paper" : "text-ink-2 hover:text-ink"}`}>
+                    {m === "client" ? "Pitching a client" : "Proposing a partnership"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="subject">Subject</Label>
+                <input id="subject" className="field" value={p.subjectTemplate} onChange={(e) => set("subjectTemplate", e.target.value)} />
+              </div>
+              <TemplateEditor id="body" label="Email body" value={body} onChange={(v) => set(templateKey, v)} />
+              <Legend />
+              {unfilled.length > 0 && <p className="text-[13px] text-warn">Replace the {unfilled.length} yellow placeholder{unfilled.length === 1 ? "" : "s"} before starting a campaign.</p>}
+              {unknown.length > 0 && <p className="text-[13px] text-bad">Envoy doesn&rsquo;t recognize {unknown.join(", ")}. Use the Insert buttons above.</p>}
+              {!ai.opening && !ai.ideas && <p className="text-[13px] text-warn">This email has no tailored parts, so every company gets the same text. Insert a tailored opening or ideas to personalize it.</p>}
+            </div>
+
+            <div className="mt-6">
+              <Label htmlFor="services" hint="Each tailored idea is built on one of these. One per line.">What you offer</Label>
+              <textarea id="services" rows={3} className="field resize-y" value={p.serviceCatalog.join("\n")} onChange={(e) => set("serviceCatalog", e.target.value.split("\n"))} placeholder={"market sizing\ncompetitive landscaping\nregulatory research"} />
+            </div>
+          </section>
+
+          <section aria-labelledby="sig-h" onFocus={() => showPreview("bottom")}>
+            <h2 id="sig-h" className="font-serif text-[22px] font-medium">Signature and footer</h2>
+            <p className="mb-4 mt-1 text-[14px] text-ink-2">Added under every email. The preview updates as you type.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field id="meName" label="Your name" value={p.meName} onChange={(v) => set("meName", v)} />
+              <Field id="meRole" label="Title" value={p.meRole} onChange={(v) => set("meRole", v)} placeholder="Project Manager" />
+              <Field id="orgName" label="Organization" value={p.orgName} onChange={(v) => set("orgName", v)} />
+              <Field id="mePronouns" label="Pronouns" hint="Optional" value={p.mePronouns} onChange={(v) => set("mePronouns", v)} />
+              <div className="sm:col-span-2"><Field id="tagline" label="Tagline" hint="Optional, one line under your organization" value={p.tagline} onChange={(v) => set("tagline", v)} /></div>
+              <Field id="phone" label="Phone" hint="Optional" value={p.phone} onChange={(v) => set("phone", v)} />
+              <Field id="signoff" label="Sign-off" value={p.signoff} onChange={(v) => set("signoff", v)} placeholder="Best," />
+              <div className="sm:col-span-2">
+                <Label htmlFor="logo" hint="Optional. PNG or JPG; shown under your signature.">Logo</Label>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- uploaded logo is a data: URI; next/image has nothing to optimize */}
+                  {p.logo && <img src={p.logo} alt="Your logo" className="max-h-10 max-w-[140px] rounded border border-rule bg-white p-1" />}
+                  <input id="logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="text-[13px] file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-ink"
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) set("logo", await logoDataUri(f)); }} />
+                  {p.logo && <button type="button" className="text-[13px] text-link hover:underline" onClick={() => set("logo", null)}>Remove</button>}
+                </div>
+              </div>
+              <div className="sm:col-span-2">
+                <Field id="postal" label="Postal address" hint="Required by US and Canadian email law. It appears in the small footer, with a one-line opt-out that Envoy always includes." value={p.postalAddress} onChange={(v) => set("postalAddress", v)} />
+              </div>
+            </div>
+          </section>
+
+          <details className="group rounded-xl border border-rule bg-surface px-5 py-4">
+            <summary className="cursor-pointer text-[15px] font-semibold">Deck attachment <span className="font-normal text-ink-3">· {p.deckName && !removeDeck ? p.deckName : deck ? deck.name : "none"}</span></summary>
+            <p className="mt-2 text-[14px] text-ink-2">Attached to each email when a campaign is set to attach it. Envoy can also read it to fill in your email.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <input id="deck" type="file" accept="application/pdf" className="text-[13px] file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-ink"
+                onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setDeck({ name: f.name, base64: await fileToBase64(f) }); setRemoveDeck(false); } }} />
+              {p.deckName && !removeDeck && <button type="button" className="text-[13px] text-link hover:underline" onClick={() => setRemoveDeck(true)}>Remove {p.deckName}</button>}
+            </div>
+          </details>
+
+          <details className="rounded-xl border border-rule bg-surface px-5 py-4">
+            <summary className="cursor-pointer text-[15px] font-semibold">Sending limits and people you&rsquo;ve already contacted</summary>
+            <div className="mt-4 grid gap-5">
+              <div>
+                <Label htmlFor="cap" hint="Envoy never sends more than 10 an hour. New Gmail accounts should stay at 30 or fewer a day.">Emails per day</Label>
+                <input id="cap" type="number" min={1} max={150} className="field max-w-[120px]" value={cap} onChange={(e) => setCap(Number(e.target.value))} />
+              </div>
+              <div>
+                <Label htmlFor="excl" hint={`Envoy skips these. Everyone you send to is added automatically. ${exclusions.length} on the list now.`}>Already contacted</Label>
+                <textarea id="excl" rows={3} className="field resize-y" value={exclText} onChange={(e) => setExclText(e.target.value)} placeholder="Paste emails or websites, separated by commas or new lines" />
+              </div>
+            </div>
+          </details>
+
+          <details className="rounded-xl border border-rule bg-surface px-5 py-4">
+            <summary className="cursor-pointer text-[15px] font-semibold">Service status</summary>
+            <ul className="mt-3 space-y-2 text-[14px]">
+              <Svc name="Gmail" on={gmail} detail={gmail ? `Sending as ${email}` : "Sign out and continue with Google to send real email."} />
+              <Svc name="AI writing" on={!!status?.integrations.anthropic} detail="Claude writes briefs and the tailored parts." />
+              <Svc name="Company search" on={!!status?.integrations.exa} detail="Exa finds companies and the right people." />
+              <Svc name="Email finding" on={!!status?.integrations.hunter} detail="Hunter finds and checks email addresses." />
+            </ul>
+            <p className="mt-3 text-[12px] text-ink-3">Anything marked Demo uses a stand-in. Keys are set by whoever runs Envoy, in envoy/.env.local.</p>
+          </details>
         </div>
-        {status?.user?.gmailConnected && <TestSend email={status.user.email} />}
-      </Section>
 
-      <Section title="Your organization" sub="Upload your outreach deck or paste your website and Envoy fills these in. You can also type them.">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="deck" hint={p.hasDeck && !removeDeck ? `Current: ${p.deckName}` : "PDF, up to 10 MB. Also used as the email attachment."}>Outreach deck</Label>
-            <input id="deck" type="file" accept="application/pdf" className="field file:mr-3 file:rounded-md file:border-0 file:bg-sunken file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-ink"
-              onChange={async (e) => { const f = e.target.files?.[0]; if (f) setDeck({ name: f.name, base64: await fileToBase64(f) }); }} />
-            {p.hasDeck && !removeDeck && <button className="mt-1 text-[13px] text-link hover:underline" onClick={() => setRemoveDeck(true)}>Remove current deck</button>}
+        <aside className="lg:sticky lg:top-6 lg:self-start">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-[13px] font-semibold text-ink-2">Preview</h2>
+            <span className="text-[12px] text-ink-3">for a sample company</span>
           </div>
-          <div>
-            <Label htmlFor="website" hint="Your homepage">Website</Label>
-            <input id="website" className="field" placeholder="yourorg.com" value={p.website} onChange={(e) => set("website", e.target.value)} />
+          <div ref={previewRef} className="max-h-[calc(100dvh-9rem)] overflow-auto rounded-xl border border-rule bg-surface p-5 shadow-[0_1px_0_var(--rule)]">
+            <EmailView
+              subject={renderSubject(p.subjectTemplate, ctx)}
+              blocks={renderBody(body, ctx)}
+              signature={sig}
+              company={SAMPLE.company}
+              attachment={(p.deckName && !removeDeck) || deck ? (deck?.name ?? p.deckName) : null}
+              highlightVars
+            />
           </div>
-        </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button variant="quiet" onClick={extract} busy={extracting} disabled={!deck && !p.website}>Read deck and website</Button>
-          <Button variant="ghost" onClick={() => { setP((cur) => ({ ...cur, ...SAMPLE })); setMsg({ tone: "warn", text: "Loaded the BEACN sample profile. Add a postal address, then save." }); }}>Use the BEACN sample</Button>
-        </div>
-        {msg && <div className="mt-4"><Notice tone={msg.tone}>{msg.text}</Notice></div>}
+        </aside>
+      </div>
 
-        <div className="mt-6 grid gap-4">
-          <Row><Field id="orgName" label="Organization name" value={p.orgName} onChange={(v) => set("orgName", v)} /></Row>
-          <Field id="oneLiner" label="One-line description" hint={`Reads as: “I'm Adam, a Project Manager at ${p.orgName || "BEACN"}, ___.”`} value={p.oneLiner} onChange={(v) => set("oneLiner", v)} />
-          <Field id="teamStructure" label="Who does the work" hint="Reads as: “To provide some context, ___.”" value={p.teamStructure} onChange={(v) => set("teamStructure", v)} />
-          <Area id="proofPoints" label="Track record" hint="One per line, e.g. 180+ projects for 150+ organizations" value={p.proofPoints.join("\n")} onChange={(v) => set("proofPoints", lines(v))} />
-          <Area id="services" label="Services" hint="One per line. Each tailored idea in an email is built on one of these." value={p.serviceCatalog.join("\n")} onChange={(v) => set("serviceCatalog", lines(v))} rows={5} />
-          <Field id="tagline" label="Signature tagline" value={p.tagline} onChange={(v) => set("tagline", v)} />
-          <Field id="deckUrl" label="Deck link" hint="Optional. Used instead of attaching the PDF when a campaign is set to link." value={p.deckUrl} onChange={(v) => set("deckUrl", v)} />
-        </div>
-      </Section>
-
-      <Section title="You">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="meName" label="Full name" value={p.meName} onChange={(v) => set("meName", v)} />
-          <Field id="meFirstName" label="First name, as you sign" value={p.meFirstName} onChange={(v) => set("meFirstName", v)} />
-          <Field id="meRole" label="Role" value={p.meRole} onChange={(v) => set("meRole", v)} />
-          <Field id="mePronouns" label="Pronouns" hint="Optional" value={p.mePronouns} onChange={(v) => set("mePronouns", v)} />
-        </div>
-      </Section>
-
-      <Section title="Required footer" sub="US and Canadian law require a postal address and a way to opt out. Envoy adds this to every email.">
-        <Field id="postalAddress" label="Organization postal address" value={p.postalAddress} onChange={(v) => set("postalAddress", v)} />
-      </Section>
-
-      <Section title="Already contacted" sub="Envoy skips these companies and people. Everyone you send to is added automatically.">
-        <Area id="excl" label="Add emails or websites" hint="Paste a list separated by commas or new lines." value={exclText} onChange={setExclText} rows={3} />
-        <p className="mt-2 text-[13px] text-ink-2">{exclusions.length ? `${exclusions.length} on the list (${exclusions.filter((e) => e.source === "sent").length} added by sending).` : "Nobody on the list yet."}</p>
-      </Section>
-
-      <Section title="Sending limit">
-        <Label htmlFor="cap" hint="New Gmail accounts should stay at 30 or below. Envoy never exceeds 10 an hour.">Emails per day</Label>
-        <input id="cap" type="number" min={1} max={150} className="field max-w-[120px]" value={cap} onChange={(e) => setCap(Number(e.target.value))} />
-        {cap > 50 && <p className="mt-2 text-[13px] text-warn">Above 50 a day raises the chance Gmail limits your account. Only go higher on a Google Workspace account with a sending history.</p>}
-      </Section>
-
-    </div>
       <div className="sticky bottom-0 -mx-5 mt-10 flex flex-wrap items-center gap-3 border-t border-rule bg-paper/95 px-5 py-4 backdrop-blur">
-        <Button onClick={save} busy={saving}>Save setup</Button>
-        {!missing.length && status?.profileComplete && <Button variant="quiet" onClick={() => router.push("/campaigns/new")}>Start a campaign</Button>}
-        {missing.length > 0 && <span className="text-[13px] text-ink-2">Still needed: {missing.join(", ")}.</span>}
+        <Button onClick={save} busy={saving} disabled={!dirty && p.saved}>{dirty || !p.saved ? "Save" : "Saved"}</Button>
+        {status?.profileComplete && !dirty && <Button variant="quiet" onClick={() => router.push("/campaigns/new")}>Start a campaign</Button>}
+        {dirty && <span className="text-[13px] text-ink-2">Unsaved changes</span>}
       </div>
     </>
   );
 }
 
-function Section({ id, title, sub, children }: { id?: string; title: string; sub?: string; children: React.ReactNode }) {
+function Check({ done, n, title, detail, action }: { done: boolean; n: number; title: string; detail: string; action?: React.ReactNode }) {
   return (
-    <section id={id} className="mt-10 scroll-mt-6 first-of-type:mt-0">
-      <h2 className="font-serif text-[22px] font-medium">{title}</h2>
-      {sub && <p className="mb-4 mt-1 text-[14px] text-ink-2">{sub}</p>}
-      {!sub && <div className="mb-4" />}
-      {children}
-    </section>
+    <li className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${done ? "border-ok-bg bg-ok-bg/50" : "border-rule bg-surface"}`}>
+      <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold ${done ? "bg-ok text-paper" : "border border-rule text-ink-2"}`} aria-hidden>
+        {done ? "✓" : n}
+      </span>
+      <div className="min-w-0 text-[14px]">
+        <p className="font-semibold">{title}<span className="sr-only">{done ? " (done)" : " (to do)"}</span></p>
+        <p className="truncate text-[13px] text-ink-2">{detail}</p>
+        {action && <p className="mt-0.5 text-[13px]">{action}</p>}
+      </div>
+    </li>
   );
 }
-function Row({ children }: { children: React.ReactNode }) { return <div className="grid gap-4 sm:grid-cols-2">{children}</div>; }
-function Field({ id, label, hint, value, onChange }: { id: string; label: string; hint?: string; value: string; onChange: (v: string) => void }) {
-  return (<div><Label htmlFor={id} hint={hint}>{label}</Label><input id={id} className="field" value={value} onChange={(e) => onChange(e.target.value)} /></div>);
-}
-function Area({ id, label, hint, value, onChange, rows = 2 }: { id: string; label: string; hint?: string; value: string; onChange: (v: string) => void; rows?: number }) {
-  return (<div><Label htmlFor={id} hint={hint}>{label}</Label><textarea id={id} rows={rows} className="field resize-y" value={value} onChange={(e) => onChange(e.target.value)} /></div>);
-}
-function Conn({ name, on, live, off, envVar, keyState }: { name: string; on: boolean; live: string; off: string; envVar: string; keyState?: "live" | "placeholder" | "missing" }) {
+
+function Legend() {
   return (
-    <div className="grid gap-x-5 gap-y-1.5 px-4 py-3.5 sm:grid-cols-[9.5rem_minmax(0,1fr)]">
-      <div className="flex items-start gap-2 sm:flex-col sm:gap-1">
-        <span className="font-semibold">{name}</span>
-        {on ? <Badge tone="ok">Live</Badge> : <Badge tone="warn">Demo</Badge>}
-      </div>
-      <div className="min-w-0 text-[14px] text-ink-2">
-        <p>{on ? live : off}</p>
-        {!on && keyState !== "live" && (
-          <p className="mt-1 text-[13px] text-ink-3">
-            {keyState === "placeholder" ? "Replace the placeholder for " : "Add "}
-            <code className="rounded bg-sunken px-1 py-0.5 text-[12px] text-ink">{envVar}</code> in <code className="rounded bg-sunken px-1 py-0.5 text-[12px] text-ink">envoy/.env.local</code>, then restart the app.
-          </p>
-        )}
-      </div>
+    <p className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-3">
+      <span><mark className="rounded-sm bg-ok-bg px-1 text-ok">green</mark> filled in per contact</span>
+      <span><mark className="rounded-sm bg-carbon px-1 text-link">blue</mark> written per company</span>
+      <span><mark className="rounded-sm bg-warn-bg px-1 text-warn">yellow</mark> needs your words</span>
+    </p>
+  );
+}
+
+function Field({ id, label, hint, value, onChange, placeholder }: { id: string; label: string; hint?: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  return (
+    <div>
+      <Label htmlFor={id} hint={hint}>{label}</Label>
+      <input id={id} className="field" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
 
-function TestSend({ email }: { email: string }) {
-  const [state, setState] = useState<{ busy?: boolean; tone?: "ok" | "bad"; text?: string }>({});
+function Svc({ name, on, detail }: { name: string; on: boolean; detail: string }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-3">
-      <Button
-        variant="quiet"
-        busy={state.busy}
-        onClick={async () => {
-          setState({ busy: true });
-          try {
-            await api("/api/send/test", { method: "POST" });
-            setState({ tone: "ok", text: `Sent to ${email}. Check your inbox.` });
-          } catch (e) {
-            setState({ tone: "bad", text: (e as Error).message });
-          }
-        }}
-      >
-        Send me a test email
-      </Button>
-      {state.text && <span className={`text-[14px] ${state.tone === "ok" ? "text-ok" : "text-bad"}`}>{state.text}</span>}
-    </div>
+    <li className="flex flex-wrap items-center gap-2">
+      <span className="w-32 font-semibold">{name}</span>
+      {on ? <Badge tone="ok">Live</Badge> : <Badge tone="warn">Demo</Badge>}
+      <span className="text-ink-2">{detail}</span>
+    </li>
   );
 }

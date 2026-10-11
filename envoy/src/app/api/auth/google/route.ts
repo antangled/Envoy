@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { appUrl, secret } from "@/lib/env";
 
-const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/gmail.send"];
+const SCOPES = ["openid", "email", "profile", "https://www.googleapis.com/auth/gmail.send"];
 
 export async function GET() {
   const clientId = secret("GOOGLE_CLIENT_ID");

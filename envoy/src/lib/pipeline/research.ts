@@ -9,7 +9,7 @@ import { heuristicBrief } from "@/lib/llm/heuristic";
 import { forModel, gatherEvidence } from "./evidence";
 import { findContacts, isSendable } from "./contacts";
 import { renderDraft, upsertDraft } from "./draft";
-import type { OrgRow } from "./org";
+import { templatesFor, type OrgRow } from "./org";
 import type { ExaPerson } from "@/lib/providers/exa";
 
 type Campaign = typeof schema.campaigns.$inferSelect;
@@ -25,7 +25,7 @@ async function aiBrief(org: OrgRow, c: Campaign, p: Prospect, docs: EvidenceDoc[
       ...docs.map((d) => textDoc(d.text, d.url, `evidence id ${d.eid} (${d.title})`)),
       {
         type: "text",
-        text: `Target company: ${p.name} (${p.domain})\nSender's goal: ${c.goalText}\nCriteria:\n${criteriaText}\nRoles the sender wants to reach: ${c.rolesSelected.join(", ")}\nProduce the brief and slots.`,
+        text: `Target company: ${p.name} (${p.domain})\nSender's goal: ${c.goalText}\nCriteria:\n${criteriaText}\nRoles the sender wants to reach: ${c.rolesSelected.join(", ")}\n\nThe sender's email template. Your hook replaces {{ai_opening}} and must read naturally with the words around it; your ideas replace {{ai_ideas}}:\n---\n${templatesFor(org)[c.mode as "client" | "partnership"]}\n---\nProduce the brief and slots.`,
       },
     ],
     schema: briefSchema(docs.map((d) => d.eid), spec.criteria.map((x) => x.id)),

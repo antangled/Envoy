@@ -15,6 +15,13 @@
       "when": 1791668559617,
       "tag": "0001_prospect_reason_url",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791680957195,
+      "tag": "0002_email_template",
+      "breakpoints": true
     }
   ]
 }

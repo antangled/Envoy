@@ -2,8 +2,8 @@ import "server-only";
 import { and, asc, eq, inArray, lte, gte } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { decrypt } from "@/lib/crypto";
-import { accessTokenFromRefresh, buildMime, sendGmail } from "@/lib/providers/gmail";
-import { footerText } from "@/lib/template/render";
+import { accessTokenFromRefresh, buildMime, logoPart, sendGmail } from "@/lib/providers/gmail";
+import { emailHtml, footerText } from "@/lib/template/render";
 import { isSendable } from "./contacts";
 import { getOrg } from "./org";
 
@@ -111,7 +111,9 @@ export async function processDue(userId?: number) {
     }
     const [draft] = await db.select().from(schema.drafts).where(eq(schema.drafts.id, s.draftId));
     const org = await getOrg(s.userId);
-    const text = `${draft.body}\n\n${footerText({ meName: org?.meName || "", orgName: org?.orgName || "", postalAddress: org?.postalAddress || "" }, s.orgName)}`;
+    const footer = footerText({ meName: org?.meName || "", orgName: org?.orgName || "", postalAddress: org?.postalAddress || "" }, s.orgName);
+    const text = `${draft.body}\n\n${footer}`;
+    const logo = logoPart(org?.logoDataUri);
     try {
       let messageId: string;
       if (s.channel === "gmail") {
@@ -123,6 +125,8 @@ export async function processDue(userId?: number) {
           toName: s.toName,
           subject: draft.subject,
           text,
+          html: emailHtml(draft.body, footer, logo?.cid ?? null),
+          logo,
           attachment: camp?.attachDeck && org?.deckB64 ? { filename: org.deckName || "deck.pdf", base64: org.deckB64 } : null,
         });
         messageId = await sendGmail(token, raw);

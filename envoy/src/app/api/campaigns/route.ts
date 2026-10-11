@@ -2,7 +2,8 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb, schema } from "@/db";
 import { HttpError, handle, requireUser } from "@/lib/session";
-import { getOrg, profileComplete } from "@/lib/pipeline/org";
+import { getOrg, profileComplete, templatesFor } from "@/lib/pipeline/org";
+import { unfilledPlaceholders, unknownTokens } from "@/lib/template/render";
 import { buildSpec } from "@/lib/pipeline/spec";
 
 export const maxDuration = 60;
@@ -38,8 +39,14 @@ const In = z.object({
 export const POST = handle(async (req: Request) => {
   const u = await requireUser();
   const org = await getOrg(u.id);
-  if (!profileComplete(org)) throw new HttpError(400, "Finish Setup first: organization name, your name and role, and at least one service.");
+  if (!profileComplete(org)) throw new HttpError(400, "Finish Setup first: add your name and organization to the signature.");
   const body = In.parse(await req.json());
+  const t = templatesFor(org);
+  const email = `${t.subject}\n${t[body.mode]}`;
+  const unfilled = unfilledPlaceholders(email);
+  if (unfilled.length) throw new HttpError(400, `Your ${body.mode === "partnership" ? "partnership" : "client"} email still has ${unfilled.length} placeholder${unfilled.length === 1 ? "" : "s"} to replace in Setup, starting with [${unfilled[0]}].`);
+  const unknown = unknownTokens(email);
+  if (unknown.length) throw new HttpError(400, `Your email uses ${unknown[0]}, which Envoy doesn't recognize. Use {{first_name}}, {{company}}, {{ai_opening}}, or {{ai_ideas}}.`);
   const goal = [body.goalText, body.advanced.geography && `Geography: ${body.advanced.geography}.`, body.advanced.sizeHint && `Company size: ${body.advanced.sizeHint}.`, body.advanced.extraCriteria && `Also must: ${body.advanced.extraCriteria}.`]
     .filter(Boolean)
     .join(" ");

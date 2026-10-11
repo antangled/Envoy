@@ -1,5 +1,5 @@
 import type { BriefAndSlots, SearchSpec } from "@/lib/llm/schemas";
-import type { RenderInput } from "@/lib/template/render";
+import type { Mode, Signature } from "@/lib/template/render";
 
 export type ContactStatus = "verified" | "accept_all" | "unknown" | "published_generic" | "not_found";
 
@@ -15,7 +15,7 @@ export interface Send { id: number; draftId: number; toEmail: string; toName: st
 
 export interface Bundle {
   campaign: Campaign; prospects: Prospect[]; briefs: Brief[]; contacts: Contact[]; drafts: Draft[]; sends: Send[];
-  org: RenderInput["org"] | null; gmailConnected: boolean; dailyCap: number;
+  org: { signature: Signature; templates: { subject: string } & Record<Mode, string>; deckName: string | null } | null; gmailConnected: boolean; dailyCap: number;
 }
 
 export const SENDABLE: ContactStatus[] = ["verified", "accept_all", "unknown"];

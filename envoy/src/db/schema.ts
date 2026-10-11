@@ -3,6 +3,7 @@ import { pgTable, text, integer, boolean, jsonb, timestamp, serial, uniqueIndex,
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   email: text("email").notNull().unique(),
+  name: text("name"),
   isDemo: boolean("is_demo").notNull().default(false),
   googleRefreshTokenEnc: text("google_refresh_token_enc"),
   dailyCap: integer("daily_cap").notNull().default(30),
@@ -29,6 +30,14 @@ export const orgProfiles = pgTable("org_profiles", {
   meRole: text("me_role").notNull().default(""),
   mePronouns: text("me_pronouns").notNull().default(""),
   extractedFrom: text("extracted_from").notNull().default("manual"),
+  // The whole email, edited as one piece. {{first_name}}, {{company}} are filled per contact;
+  // {{ai_opening}} and {{ai_ideas}} are written per company; [bracketed text] still needs the user's words.
+  subjectTemplate: text("subject_template").notNull().default(""),
+  templateClient: text("template_client").notNull().default(""),
+  templatePartnership: text("template_partnership").notNull().default(""),
+  signoff: text("signoff").notNull().default("Best,"),
+  phone: text("phone").notNull().default(""),
+  logoDataUri: text("logo_data_uri"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

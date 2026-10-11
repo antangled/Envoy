@@ -116,7 +116,7 @@ export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void>
         {b.org && (
           <div className="rounded-xl border border-rule bg-surface p-5">
             <h3 className="text-[15px] font-semibold">Footer on every email</h3>
-            <pre className="mt-2 whitespace-pre-wrap font-sans text-[13px] text-ink-2">{footerText(b.org, pending[0]?.p.name || "the company")}</pre>
+            <pre className="mt-2 whitespace-pre-wrap font-sans text-[13px] text-ink-2">{footerText({ meName: b.org.signature.name, orgName: b.org.signature.org, postalAddress: b.org.signature.postalAddress }, pending[0]?.p.name || "the company")}</pre>
           </div>
         )}
         {err && <Notice tone="bad">{err}</Notice>}

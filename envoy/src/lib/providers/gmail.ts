@@ -22,15 +22,26 @@ const b64 = (s: string | Buffer) => Buffer.from(s).toString("base64");
 const wrap = (s: string) => s.replace(/.{1,76}/g, "$&\r\n");
 const encodeHeader = (s: string) => (/^[\x20-\x7e]*$/.test(s) ? s : `=?UTF-8?B?${b64(s)}?=`);
 
+/**
+ * multipart/mixed
+ *   multipart/alternative
+ *     text/plain
+ *     multipart/related (only when there's a logo)
+ *       text/html
+ *       image/* (Content-ID: logo)
+ *   application/pdf (only when attaching the deck)
+ */
 export function buildMime(opts: {
   from: string;
   to: string;
   toName?: string | null;
   subject: string;
   text: string;
+  html?: string | null;
+  logo?: { mime: string; base64: string; cid: string } | null;
   attachment?: { filename: string; base64: string } | null;
 }) {
-  const boundary = "envoy_" + crypto.randomBytes(8).toString("hex");
+  const b = () => "envoy_" + crypto.randomBytes(8).toString("hex");
   const to = opts.toName ? `${encodeHeader(opts.toName)} <${opts.to}>` : opts.to;
   const headers = [
     `From: ${opts.from}`,
@@ -40,21 +51,32 @@ export function buildMime(opts: {
     `Message-ID: <${crypto.randomUUID()}@envoy.local>`,
     "MIME-Version: 1.0",
   ];
-  const textPart = ["Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: base64", "", wrap(b64(opts.text))].join("\r\n");
-  let mime: string;
-  if (opts.attachment) {
-    const att = [
-      `Content-Type: application/pdf; name="${opts.attachment.filename}"`,
-      `Content-Disposition: attachment; filename="${opts.attachment.filename}"`,
-      "Content-Transfer-Encoding: base64",
-      "",
-      wrap(opts.attachment.base64),
-    ].join("\r\n");
-    mime = [...headers, `Content-Type: multipart/mixed; boundary="${boundary}"`, "", `--${boundary}`, textPart, `--${boundary}`, att, `--${boundary}--`, ""].join("\r\n");
-  } else {
-    mime = [...headers, textPart].join("\r\n");
+  const part = (type: string, body: string, extra: string[] = []) => [`Content-Type: ${type}`, ...extra, "Content-Transfer-Encoding: base64", "", wrap(body)].join("\r\n");
+  const multipart = (kind: string, parts: string[]) => {
+    const bd = b();
+    return [`Content-Type: multipart/${kind}; boundary="${bd}"`, "", ...parts.flatMap((p) => [`--${bd}`, p]), `--${bd}--`, ""].join("\r\n");
+  };
+  const textPart = part("text/plain; charset=UTF-8", b64(opts.text));
+  let content = textPart;
+  if (opts.html) {
+    let htmlPart = part("text/html; charset=UTF-8", b64(opts.html));
+    if (opts.logo) {
+      const img = part(opts.logo.mime, opts.logo.base64, [`Content-ID: <${opts.logo.cid}>`, `Content-Disposition: inline; filename="logo"`]);
+      htmlPart = multipart("related", [htmlPart, img]);
+    }
+    content = multipart("alternative", [textPart, htmlPart]);
   }
-  return Buffer.from(mime).toString("base64url");
+  if (opts.attachment) {
+    const att = part(`application/pdf; name="${opts.attachment.filename}"`, opts.attachment.base64, [`Content-Disposition: attachment; filename="${opts.attachment.filename}"`]);
+    content = multipart("mixed", [content, att]);
+  }
+  return Buffer.from([...headers, content].join("\r\n")).toString("base64url");
+}
+
+/** Splits a data: URI into the pieces an inline MIME image needs. */
+export function logoPart(dataUri: string | null | undefined) {
+  const m = dataUri?.match(/^data:(image\/(?:png|jpeg|gif|webp));base64,(.+)$/);
+  return m ? { mime: m[1], base64: m[2], cid: "logo@envoy" } : null;
 }
 
 export async function sendGmail(accessToken: string, raw: string): Promise<string> {

@@ -1,23 +1,17 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { renderSegments, segmentsToText, type Mode } from "@/lib/template/render";
+import { draftText, renderBody, renderSubject, type Mode } from "@/lib/template/render";
 import type { BriefAndSlots } from "@/lib/llm/schemas";
-import { orgForRender, type OrgRow } from "./org";
+import { signatureFor, templatesFor, type OrgRow } from "./org";
 
 type Campaign = typeof schema.campaigns.$inferSelect;
 type Contact = typeof schema.contacts.$inferSelect;
 
 export function renderDraft(org: OrgRow, c: Campaign, companyName: string, contact: Contact | null, brief: BriefAndSlots) {
-  const segs = renderSegments({
-    mode: c.mode as Mode,
-    org: orgForRender(org),
-    campaign: { offerPhrase: c.searchSpec?.offer_phrase || "a focused project", seasonLabel: c.searchSpec?.season_label || "upcoming", attachDeck: c.attachDeck },
-    company: { name: companyName },
-    contact: { firstName: contact?.firstName ?? null },
-    slots: { hook: brief.hook, ideas: brief.ideas },
-  });
-  return { subject: brief.subject, body: segmentsToText(segs) };
+  const t = templatesFor(org);
+  const ctx = { company: companyName, firstName: contact?.firstName ?? null, slots: { hook: brief.hook, ideas: brief.ideas } };
+  return { subject: renderSubject(t.subject, ctx), body: draftText(renderBody(t[c.mode as Mode], ctx), signatureFor(org)) };
 }
 
 export async function upsertDraft(prospectId: number, contactId: number | null, subject: string, body: string, selected: boolean) {
