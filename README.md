@@ -1,9 +1,5 @@
-# Envoy
-
-Goal → organizations → evidence-backed brief → right contact → reviewed email → sent from your own Gmail.
-For consultants, agencies, and founders doing client outreach and business partnerships.
-
-**New here? Start with [docs/HANDOFF.md](docs/HANDOFF.md)** — how it works, how to run it locally, and how to make changes.
+# Project Thesis
+Envoy brings company discovery, research and personalized outreach into one workflow for consultants, agencies and small business teams. Built by Adam Tang and Jiwoo Jung, it grew from Adam’s consulting-club experience: preparing outreach to one company took over an hour across Apollo, spreadsheets, Claude and GMass. Our thesis is that sharing context between research and email drafting can reduce preparation time while preserving relevance and the sender’s voice. Envoy supports client prospecting and business partnerships through three stages: set criteria, review research and send selected emails. Profiles provide source links, visible information gaps and criteria marked Supported, Not met or Unknown. Drafts combine company-specific personalization with the sender’s existing template, and users review recipients and messages before approving sending. Our proposed business model pairs an ad-supported free plan for individuals with a $29/month Business subscription. Next, we will evaluate time saved, draft quality, cost per usable contact and willingness to pay with small teams conducting real outreach.
 
 Build spec: [docs/MVP-PLAN.md](docs/MVP-PLAN.md). Next steps: [docs/NEXT-STEPS.md](docs/NEXT-STEPS.md).
 Team brief: [docs/INFO-SHEET.md](docs/INFO-SHEET.md). Research with sources: [docs/research/](docs/research/).
