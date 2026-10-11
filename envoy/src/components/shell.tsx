@@ -20,36 +20,50 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const live = i ? [i.anthropic && "AI", i.exa && "Discovery", i.hunter && "Contacts"].filter(Boolean) : [];
   const demo = i && (!i.anthropic || !i.exa || !i.hunter);
 
+  // The signed-out home page is the marketing page and brings its own navigation, full width.
+  if (path === "/") return <>{children}</>;
+
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-rule bg-surface">
-        <div className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-x-8 gap-y-2 px-5 py-3">
-          <Link href={user ? "/campaigns" : "/"} className="flex items-center gap-2.5">
+      <header className="sticky top-0 z-20 border-b border-rule bg-surface/90 backdrop-blur-md supports-[backdrop-filter]:bg-surface/80">
+        <div className="mx-auto flex h-14 max-w-[1180px] items-center gap-x-6 px-5">
+          <Link href={user ? "/campaigns" : "/"} className="flex items-center gap-2.5 rounded-md">
             <Logo />
           </Link>
           {user && (
-            <nav className="flex gap-1" aria-label="Main">
+            <nav className="flex gap-0.5" aria-label="Main">
               {NAV.map((n) => {
                 const active = path.startsWith(n.href);
                 return (
-                  <Link key={n.href} href={n.href} aria-current={active ? "page" : undefined} className={`rounded-md px-3 py-1.5 text-[14px] font-medium ${active ? "bg-sunken text-ink" : "text-ink-2 hover:text-ink"}`}>
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    aria-current={active ? "page" : undefined}
+                    className={`rounded-md px-2.5 py-1.5 text-[14px] font-medium transition-colors duration-150 ${active ? "bg-sunken text-ink" : "text-ink-2 hover:bg-sunken/70 hover:text-ink"}`}
+                  >
                     {n.label}
                   </Link>
                 );
               })}
             </nav>
           )}
-          <div className="ml-auto flex items-center gap-4 text-[13px] text-ink-2">
+          <div className="ml-auto flex items-center gap-3 text-[13px] text-ink-2">
             {demo && (
-              <Link href="/setup#connections" className="rounded-full bg-warn-bg px-2.5 py-1 font-semibold text-warn" title={`Live: ${live.join(", ") || "none"}`}>
+              <Link href="/setup#connections" className="rounded-full border border-warn/30 bg-warn-bg px-2.5 py-0.5 font-semibold text-warn" title={`Live: ${live.join(", ") || "none"}`}>
                 Demo mode
               </Link>
             )}
             {user && (
               <>
-                <span className="hidden sm:inline">{user.email}</span>
+                <span className="hidden items-center gap-2 sm:flex">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-brand text-[11px] font-semibold text-on-seal" aria-hidden>
+                    {user.email.slice(0, 1).toUpperCase()}
+                  </span>
+                  {user.email}
+                </span>
+                <span className="hidden h-4 w-px bg-rule sm:block" aria-hidden />
                 <button
-                  className="text-link hover:underline"
+                  className="rounded-md px-1.5 py-1 font-medium text-ink-2 hover:text-ink"
                   onClick={async () => {
                     await api("/api/auth/logout", { method: "POST" });
                     await refresh();

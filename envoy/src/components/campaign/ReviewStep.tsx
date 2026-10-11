@@ -30,7 +30,7 @@ export function ReviewStep({ b, reload, progress, running, onContinue }: { b: Bu
         </nav>
         <div className="min-w-0">{active ? <Dossier key={active.id} p={active} b={b} reload={reload} progress={progress[active.id]} /> : <p className="text-ink-2">Select an organization.</p>}</div>
       </div>
-      <div className="sticky bottom-0 -mx-5 mt-8 flex flex-wrap items-center gap-3 border-t border-rule bg-paper/95 px-5 py-4 backdrop-blur">
+      <div className="sticky bottom-0 -mx-5 mt-8 flex flex-wrap items-center gap-3 border-t border-rule bg-canvas/95 px-5 py-4 backdrop-blur">
         <Button onClick={onContinue} disabled={running || !selectedCount}>Review {selectedCount} email{selectedCount === 1 ? "" : "s"} to send</Button>
         <span className="text-[13px] text-ink-2">{running ? "You can read briefs as they finish." : "Toggle Send on each draft you want to include."}</span>
       </div>
@@ -193,7 +193,7 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
                 <ContactBadge status={c.emailStatus} named={!!c.name} checked={c.confidence !== null} />
                 <span className="font-semibold">{c.name || (c.emailStatus === "not_found" ? `No named contact. Try: ${c.title}` : "Company address")}</span>
                 {c.title && c.name && <span className="text-[14px] text-ink-2">{c.title}</span>}
-                {c.email && <span className="text-[14px] tabular-nums">{c.email}</span>}
+                {c.email && <span className="text-[14px]">{c.email}</span>}
                 {!c.email && c.name && c.confidence === null && status?.integrations.hunter && (
                   <Button variant="ghost" className="text-[13px]" busy={busy === `e${c.id}`} onClick={() => findEmail(c.id)}>Find email</Button>
                 )}
@@ -230,7 +230,7 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
           <label htmlFor={`subj${draft.id}`} className="text-[12px] font-semibold text-ink-2">Subject</label>
           <input key={draft.subject} id={`subj${draft.id}`} className="field mt-1" defaultValue={draft.subject} onBlur={(e) => e.target.value !== draft.subject && patch({ subject: e.target.value }, "subject")} />
         </div>
-        <div className="border-t border-rule bg-[color-mix(in_oklab,var(--surface),var(--paper)_40%)] px-6 py-6 sm:px-10">
+        <div className="border-t border-rule bg-[color-mix(in_oklab,var(--surface),var(--canvas)_40%)] px-6 py-6 sm:px-10">
           {editing ? (
             <AutoGrow value={body} onChange={setBody} />
           ) : (

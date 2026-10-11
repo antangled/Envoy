@@ -87,7 +87,7 @@ export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void>
                     <p className="font-semibold">{s.orgName}</p>
                     <p className="break-all text-ink-2">{s.toEmail}</p>
                   </div>
-                  <span className="flex shrink-0 items-center gap-2 tabular-nums">
+                  <span className="flex shrink-0 items-center gap-2">
                     {s.status === "scheduled" && <><span className="working h-1.5 w-1.5 rounded-full bg-seal" /><span className="text-ink-2">{fmt(s.scheduledAt)}</span>
                       <button className="text-[13px] text-link hover:underline" onClick={async () => { await api(`/api/sends/${s.id}`, { method: "PATCH", json: { cancel: true } }); await reload(); }}>Cancel</button></>}
                     {s.status === "sent" && <span className="seal-press inline-flex"><Badge tone="ok">{s.channel === "demo" ? "Recorded" : "Sent"}</Badge></span>}

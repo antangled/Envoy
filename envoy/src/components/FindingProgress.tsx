@@ -30,7 +30,7 @@ export function FindingProgress({ phase, live }: { phase: "goal" | "search"; liv
   return (
     <div className="mx-auto max-w-[680px] py-6" role="status" aria-live="polite">
       <h2 className="font-serif text-[30px] font-medium leading-tight">Finding organizations for you</h2>
-      <p className="mt-2 text-[15px] text-ink-2 tabular-nums">
+      <p className="mt-2 text-[15px] text-ink-2">
         {Math.floor(t)}s{live ? " · usually under a minute" : ""}
       </p>
 
@@ -41,7 +41,7 @@ export function FindingProgress({ phase, live }: { phase: "goal" | "search"; liv
       <ol className="mt-6 space-y-3">
         {steps.map((s, i) => (
           <li key={i} className={`flex items-center gap-3 text-[15px] ${s.done || s.active ? "text-ink" : "text-ink-3"}`}>
-            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold ${s.done ? "bg-ok text-paper" : s.active ? "border-2 border-seal" : "border border-rule"}`}>
+            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold ${s.done ? "bg-ok text-canvas" : s.active ? "border-2 border-seal" : "border border-rule"}`}>
               {s.done ? "✓" : s.active ? <span className="working h-2 w-2 rounded-full bg-seal" /> : i + 1}
             </span>
             {s.label}

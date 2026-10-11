@@ -62,7 +62,7 @@ export default function NewCampaign() {
         <div className="inline-flex rounded-lg border border-rule bg-surface p-1" role="radiogroup">
           {(["client", "partnership"] as const).map((m) => (
             <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => setMode(m)}
-              className={`rounded-md px-4 py-1.5 text-[14px] font-semibold ${mode === m ? "bg-ink text-paper" : "text-ink-2 hover:text-ink"}`}>
+              className={`rounded-md px-4 py-1.5 text-[14px] font-semibold ${mode === m ? "bg-ink text-canvas" : "text-ink-2 hover:text-ink"}`}>
               {m === "client" ? "Pitching a client" : "Proposing a partnership"}
             </button>
           ))}
@@ -76,13 +76,14 @@ export default function NewCampaign() {
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="count" hint="Envoy returns fewer if it can't find enough good fits.">How many organizations</Label>
-          <input id="count" type="number" min={1} max={50} className="field max-w-[120px]" value={count} onChange={(e) => setCount(Number(e.target.value))} />
+        {/* Inputs sit on a shared baseline even when one hint wraps to two lines. */}
+        <div className="flex flex-col">
+          <Label htmlFor="count" hint="Fewer if there aren't enough good fits.">How many organizations</Label>
+          <input id="count" type="number" min={1} max={50} className="field mt-auto max-w-[120px]" value={count} onChange={(e) => setCount(Number(e.target.value))} />
         </div>
-        <div>
-          <Label htmlFor="people" hint="Several people per role are fine. Emails are looked up only for the people you choose.">People per company</Label>
-          <input id="people" type="number" min={1} max={20} className="field max-w-[120px]" value={people} onChange={(e) => setPeople(Number(e.target.value))} />
+        <div className="flex flex-col">
+          <Label htmlFor="people" hint="Emails are looked up only for people you pick.">People per company</Label>
+          <input id="people" type="number" min={1} max={20} className="field mt-auto max-w-[120px]" value={people} onChange={(e) => setPeople(Number(e.target.value))} />
         </div>
         <div>
           <span className="mb-1.5 block text-[14px] font-semibold">Your deck</span>

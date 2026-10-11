@@ -227,7 +227,7 @@ export default function SetupPage() {
               <h2 id="email-h" className="font-serif text-[22px] font-medium">The email</h2>
               <div className="inline-flex rounded-lg border border-rule bg-surface p-1" role="tablist" aria-label="Which email">
                 {(["client", "partnership"] as const).map((m) => (
-                  <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1 text-[13px] font-semibold ${mode === m ? "bg-ink text-paper" : "text-ink-2 hover:text-ink"}`}>
+                  <button key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={`rounded-md px-3 py-1 text-[13px] font-semibold ${mode === m ? "bg-ink text-canvas" : "text-ink-2 hover:text-ink"}`}>
                     {m === "client" ? "Pitching a client" : "Proposing a partnership"}
                   </button>
                 ))}
@@ -328,7 +328,7 @@ export default function SetupPage() {
         </aside>
       </div>
 
-      <div className="sticky bottom-0 -mx-5 mt-10 flex flex-wrap items-center gap-3 border-t border-rule bg-paper/95 px-5 py-4 backdrop-blur">
+      <div className="sticky bottom-0 -mx-5 mt-10 flex flex-wrap items-center gap-3 border-t border-rule bg-canvas/95 px-5 py-4 backdrop-blur">
         <Button onClick={save} busy={saving} disabled={!dirty && p.saved}>{dirty || !p.saved ? "Save" : "Saved"}</Button>
         {status?.profileComplete && !dirty && <Button variant="quiet" onClick={() => router.push("/campaigns/new")}>Start a campaign</Button>}
         {dirty && <span className="text-[13px] text-ink-2">Unsaved changes</span>}
@@ -340,7 +340,7 @@ export default function SetupPage() {
 function Check({ done, n, title, detail, action }: { done: boolean; n: number; title: string; detail: string; action?: React.ReactNode }) {
   return (
     <li className={`flex min-w-0 items-start gap-3 rounded-xl border px-4 py-3 ${done ? "border-ok-bg bg-ok-bg/50" : "border-rule bg-surface"}`}>
-      <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold ${done ? "bg-ok text-paper" : "border border-rule text-ink-2"}`} aria-hidden>
+      <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold ${done ? "bg-ok text-canvas" : "border border-rule text-ink-2"}`} aria-hidden>
         {done ? "✓" : n}
       </span>
       <div className="min-w-0 text-[14px]">

@@ -39,7 +39,7 @@ export default function History() {
               </div>
               <p className="break-all text-ink-2">{r.toEmail}</p>
               <p className="truncate text-[13px] text-ink-3">{r.subject}</p>
-              <p className="text-[13px] text-ink-3 tabular-nums">{new Date(r.sentAt ?? r.scheduledAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
+              <p className="text-[13px] text-ink-3">{new Date(r.sentAt ?? r.scheduledAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</p>
               {r.status === "sent" && (
                 <div className="flex gap-4 pt-1 text-[13px]">
                   <button className="text-link hover:underline" onClick={() => patch(r.id, { replied: !r.replied })}>{r.replied ? "Unmark reply" : "Mark replied"}</button>
@@ -69,7 +69,7 @@ export default function History() {
                   <td className="whitespace-nowrap px-4 py-3 font-semibold"><Link href={`/campaigns/${r.campaignId}`} className="hover:underline">{r.orgName}</Link></td>
                   <td className="px-4 py-3 text-ink-2">{r.toName && <span className="block text-ink">{r.toName}</span>}{r.toEmail}</td>
                   <td className="max-w-[220px] truncate px-4 py-3 text-ink-2" title={r.subject}>{r.subject}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-ink-2 tabular-nums">{new Date(r.sentAt ?? r.scheduledAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-ink-2">{new Date(r.sentAt ?? r.scheduledAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</td>
                   <td className="px-4 py-3"><StatusBadges r={r} /></td>
                   <td className="whitespace-nowrap px-4 py-3 text-right text-[13px]">
                     {r.status === "sent" && (

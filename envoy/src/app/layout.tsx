@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { Newsreader, Public_Sans } from "next/font/google";
+import { Brygada_1918, Schibsted_Grotesk } from "next/font/google";
 import "./globals.css";
 import { StatusProvider } from "@/components/status";
 import { Shell } from "@/components/shell";
 
-const serif = Newsreader({ subsets: ["latin"], variable: "--font-newsreader", style: ["normal", "italic"], weight: ["400", "500", "600"] });
-const sans = Public_Sans({ subsets: ["latin"], variable: "--font-public-sans", weight: ["400", "500", "600", "700"] });
+// Brygada 1918: a revived 1918 book face with letterhead formality, for display type and the letter itself.
+// Schibsted Grotesk: a crisp newspaper grotesk for every interface label, control, and table.
+const serif = Brygada_1918({ subsets: ["latin"], variable: "--font-display", style: ["normal", "italic"], weight: ["400", "500", "600", "700"] });
+const sans = Schibsted_Grotesk({ subsets: ["latin"], variable: "--font-ui", weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
   title: "Envoy",

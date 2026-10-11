@@ -103,9 +103,9 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
                 disabled={!reachable}
                 aria-current={current ? "step" : undefined}
                 onClick={() => { setStep(s.key); window.scrollTo({ top: 0 }); }}
-                className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[14px] font-medium disabled:opacity-40 ${current ? "border-ink bg-ink text-paper" : "border-rule bg-surface text-ink-2 hover:text-ink"}`}
+                className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[14px] font-medium disabled:opacity-40 ${current ? "border-ink bg-ink text-canvas" : "border-rule bg-surface text-ink-2 hover:text-ink"}`}
               >
-                <span className={`grid h-5 w-5 place-items-center rounded-full text-[12px] tabular-nums ${current ? "bg-paper text-ink" : "bg-sunken text-ink-2"}`}>{i + 1}</span>
+                <span className={`grid h-5 w-5 place-items-center rounded-full text-[12px] tabular-nums ${current ? "bg-canvas text-ink" : "bg-sunken text-ink-2"}`}>{i + 1}</span>
                 {s.label}
               </button>
             </li>
@@ -127,7 +127,7 @@ function Spend({ u, companies }: { u: { claudeUsd: number; exaUsd: number; hunte
   if (!total && !u.hunterLookups) return null;
   const money = (n: number) => (n < 0.01 ? "under $0.01" : `$${n.toFixed(2)}`);
   return (
-    <p className="mt-2 text-[13px] text-ink-2 tabular-nums" title="List prices. Hunter lookups come out of your Hunter plan's monthly allowance.">
+    <p className="mt-2 text-[13px] text-ink-2" title="List prices. Hunter lookups come out of your Hunter plan's monthly allowance.">
       Spent so far: <span className="font-semibold text-ink">{money(total)}</span>
       {" "}(AI writing {money(u.claudeUsd ?? 0)}, company and people search {money(u.exaUsd ?? 0)})
       {" · "}{u.hunterLookups ?? 0} email lookup{u.hunterLookups === 1 ? "" : "s"}

@@ -4,18 +4,20 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 type Variant = "primary" | "seal" | "quiet" | "ghost";
 const styles: Record<Variant, string> = {
-  primary: "bg-ink text-paper hover:opacity-90",
+  primary: "bg-ink text-canvas hover:opacity-90",
   seal: "bg-seal text-on-seal hover:bg-seal-hover",
   quiet: "bg-surface text-ink border border-rule hover:bg-sunken",
-  ghost: "text-link hover:underline px-0",
+  ghost: "text-link hover:underline",
 };
+// Ghost buttons sit inline in text and rows, so they take no fixed height or padding.
+const size = (v: Variant) => (v === "ghost" ? "" : "h-9 px-3.5");
 
 export function Button({ variant = "primary", className = "", busy, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; busy?: boolean }) {
   return (
     <button
       {...rest}
       disabled={rest.disabled || busy}
-      className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-[14px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg text-[14px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${size(variant)} ${styles[variant]} ${className}`}
     >
       {busy && <span className="working inline-block h-2 w-2 rounded-full bg-current" aria-hidden />}
       {children}
@@ -25,7 +27,7 @@ export function Button({ variant = "primary", className = "", busy, children, ..
 
 export function LinkButton({ href, variant = "primary", children, className = "" }: { href: string; variant?: Variant; children: ReactNode; className?: string }) {
   return (
-    <Link href={href} className={`inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-[14px] font-semibold transition-colors ${styles[variant]} ${className}`}>
+    <Link href={href} className={`inline-flex items-center justify-center gap-2 rounded-lg text-[14px] font-semibold transition-colors duration-150 ${size(variant)} ${styles[variant]} ${className}`}>
       {children}
     </Link>
   );
@@ -63,8 +65,8 @@ export function Label({ htmlFor, children, hint }: { htmlFor: string; children: 
 export function PageTitle({ children, sub }: { children: ReactNode; sub?: ReactNode }) {
   return (
     <div className="mb-8">
-      <h1 className="font-serif text-[34px] font-medium leading-tight tracking-[-0.01em] text-ink">{children}</h1>
-      {sub && <p className="mt-2 max-w-[62ch] text-[15px] text-ink-2">{sub}</p>}
+      <h1 className="font-serif text-[32px] font-medium leading-[1.12] tracking-[-0.015em] text-ink">{children}</h1>
+      {sub && <p className="mt-2.5 max-w-[62ch] text-[15px] leading-relaxed text-ink-2">{sub}</p>}
     </div>
   );
 }

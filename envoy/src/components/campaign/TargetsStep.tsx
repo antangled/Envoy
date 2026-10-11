@@ -87,7 +87,7 @@ export function TargetsStep({ b, reload, onResearch }: { b: Bundle; reload: () =
               const on = roles.includes(r.title);
               return (
                 <button key={r.title} type="button" aria-pressed={on} onClick={() => saveRoles(on ? roles.filter((x) => x !== r.title) : [...roles, r.title])}
-                  className={`rounded-full border px-3 py-1 text-[13px] font-medium ${on ? "border-ink bg-ink text-paper" : "border-rule bg-surface text-ink-2 hover:text-ink"}`}>
+                  className={`rounded-full border px-3 py-1 text-[13px] font-medium ${on ? "border-ink bg-ink text-canvas" : "border-rule bg-surface text-ink-2 hover:text-ink"}`}>
                   {r.title}
                 </button>
               );
