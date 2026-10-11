@@ -121,7 +121,7 @@ Mock checks exercise application behavior without establishing the quality of re
 | Proposed monthly price | $0 | $29 |
 | Primary audience | Individuals exploring occasional outreach. | Businesses, freelancers and recurring outreach users. |
 | Advertising | Ad-supported within Envoy. | Ad-free. |
-| Research allowance | Limited monthly credits; final allowance to be validated. | Proposed launch allowance of 50 monthly research credits. |
+| Research allowance | Limited monthly credits; final allowance to be validated. | Proposed launch allowance of 200+ monthly research credits. |
 
 One credit represents a completed company profile plus a personalized draft. It does not guarantee an available email address, delivery or a response. Prices, allowances, advertising and billing are commercial proposals for validation.
 
