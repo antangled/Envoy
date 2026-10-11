@@ -10,6 +10,12 @@ Built by **Adam Tang and Jiwoo Jung** for the UC Berkeley Innovation Intelligenc
 
 Envoy brings company discovery, research and personalized outreach into one workflow for consultants, agencies and small business teams. Built by Adam Tang and Jiwoo Jung, it grew from Adam’s consulting-club experience: preparing outreach to one company took over an hour across Apollo, spreadsheets, Claude and GMass. Our thesis is that sharing context between research and email drafting can reduce preparation time while preserving relevance and the sender’s voice. Envoy supports client prospecting and business partnerships through three stages: set criteria, review research and send selected emails. Profiles provide source links, visible information gaps and criteria marked **Supported**, **Not met** or **Unknown**. Drafts combine company-specific personalization with the sender’s existing template, and users review recipients and messages before approving sending. Our proposed business model pairs an ad-supported free plan for individuals with a **$29/month Business subscription**. Next, we will evaluate time saved, draft quality, cost per usable contact and willingness to pay with small teams conducting real outreach.
 
+## Pitch / demo video
+
+**Video link: to be added before submission.** Add the publicly accessible 2–3 minute recording here and test it while signed out.
+
+<!-- Replace the line above with a Markdown link to your actual uploaded recording. -->
+
 ## For judges
 
 - Read the [project thesis](#project-thesis) for the problem and product insight.
@@ -86,19 +92,50 @@ Keep credentials server-side and out of commits. For Google OAuth setup and prod
 
 **Contact-provider roadmap:** the current submitted contact pipeline still uses Hunter and company-published addresses. Anymail Finder is the planned replacement; that migration must be integrated and verified before being described as part of the submitted implementation.
 
-## Technical approach
+## Technology behind Envoy
 
-| Layer | Implementation |
+Envoy is a full-stack **Next.js, React and TypeScript** application. Its main technical idea is to reuse the same structured company research for the profile and the personalized email, while keeping sender-authored content and sending approval under the user's control.
+
+| Layer | Current implementation |
 |---|---|
-| Interface and API | Next.js App Router, React and TypeScript. |
+| Interface and API | Next.js App Router, React and TypeScript; campaign API routes coordinate discovery, research, review and queueing. |
 | Styling | Tailwind CSS. |
-| Data | Drizzle ORM, local PGlite and a Postgres production configuration. |
-| Discovery and evidence | Exa plus accessible company websites. |
-| Research and drafting | Claude, structured output, source-reference and quote checks, and a template renderer. |
-| Contacts | Current Hunter integration plus company-published professional contact details. |
-| Sending | Google OAuth and the Gmail API with send-only permission. |
+| Discovery | Exa searches for companies and relevant professional roles using the campaign goal and targeting criteria. |
+| Evidence collection | Accessible company pages are fetched and cleaned with Mozilla Readability; Exa supplies additional searchable evidence. Each retained document receives a source reference. |
+| AI research | Anthropic Claude produces a structured company brief, criterion assessments and personalization sections. Haiku is the primary model; selected validation failures can trigger a Sonnet retry. |
+| Validation | JSON schemas and Zod constrain the output shape. Additional checks validate source IDs and quoted text; a model verifier reviews selected criteria and benefit claims. |
+| Email assembly | A template renderer combines sender details, contact/company fields and the research-derived opening and optional ideas. Users can edit the final draft before approving it. |
+| Contact lookup | The current code combines Hunter with professional contact details published by companies. Anymail Finder is a planned replacement, not yet the submitted integration. |
+| Sending and history | Google OAuth and the Gmail API submit user-approved messages through a sending queue; the app stores submission status and failures. |
+| Data and credentials | Drizzle ORM with local PGlite and a Postgres production configuration. Provider credentials stay server-side; Gmail refresh tokens are encrypted with AES-256-GCM. |
 
-Source-reference validation establishes traceability; a valid link or matching quote alone does not prove that a source supports every associated claim. Users should review the source context and personalized message before sending.
+### From a goal to a reviewed message
+
+1. **Discover candidates.** The campaign goal becomes targeting criteria and role suggestions. The user selects organizations for research.
+2. **Build shared research.** The pipeline gathers a bounded set of company pages and evidence, then generates a brief and personalization sections together.
+3. **Validate and assemble.** Source and quote checks help identify malformed or unsupported output. The template renderer preserves the sender's ordinary template text and inserts the personalized sections.
+4. **Review and approve.** Users inspect sources, contact information and the editable draft before selecting recipients and approving queueing.
+5. **Submit and record.** The configured live workflow submits approved messages through Gmail; the sample demo records them in a simulated outbox.
+
+```mermaid
+flowchart TD
+    A["Campaign goal and selected companies"] --> B["Shared company evidence"]
+    B --> C["Company brief and criteria"]
+    B --> D["Personalization sections"]
+    E["Sender's saved template"] --> F["Editable email draft"]
+    D --> F
+    C --> G["User reviews and selects"]
+    F --> G
+    G --> H["Approved sending queue"]
+```
+
+The research and drafting stages share context, so the email opening can refer to the same company information shown in the profile. The two campaign modes reuse this architecture with different goals and sender templates.
+
+**Evidence checks have limits.** Source-reference validation establishes traceability; a valid reference or matching quote does not prove that every related claim is supported. The model verifier covers selected claims and is not a guarantee of correctness. Users should review source context and inferred opportunities before sending.
+
+**Permission and demo boundaries.** Gmail access uses send-only permission; it does not enable inbox, reply or bounce monitoring. The built-in demo uses scripted research and drafts rather than external AI calls. Advertising, subscriptions and credit enforcement remain proposed commercial features.
+
+Implementation: [pipeline](envoy/src/lib/pipeline/), [AI schemas and validation](envoy/src/lib/llm/), [template renderer](envoy/src/lib/template/), [provider integrations](envoy/src/lib/providers/) and [database](envoy/src/db/).
 
 ## Verification
 
