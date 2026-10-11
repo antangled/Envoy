@@ -29,6 +29,8 @@ export interface StructuredCall<T> {
   model?: string;
   effort?: "low" | "medium" | "high";
   maxTokens?: number;
+  /** Names the step in the cost ledger, e.g. "brief" or "verifier". */
+  label?: string;
 }
 
 export interface StructuredResult<T> {
@@ -64,8 +66,13 @@ async function once<T>(req: StructuredCall<T>, model: string): Promise<Structure
     messages: [{ role: "user", content: req.content }],
     output_config: { effort: req.effort ?? "medium", format: { type: "json_schema", schema: req.schema } },
   });
+  // Record before any throw: refused or truncated calls are still billed.
+  recordClaude(
+    model,
+    { input: msg.usage.input_tokens, output: msg.usage.output_tokens, cacheRead: msg.usage.cache_read_input_tokens ?? 0, cacheWrite: msg.usage.cache_creation_input_tokens ?? 0 },
+    `${req.label ?? "claude"}${msg.stop_reason === "max_tokens" ? ":truncated" : ""}`,
+  );
   if (msg.stop_reason === "refusal") throw new RefusalError("Model declined this request");
-  recordClaude(model, { input: msg.usage.input_tokens, output: msg.usage.output_tokens, cacheRead: msg.usage.cache_read_input_tokens ?? 0 });
   const text = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
   let json: unknown;
   try {

@@ -39,6 +39,7 @@ export const POST = handle(async (_req: Request, ctx: { params: Promise<{ id: st
       schema: slotsSchema(docs.map((d) => d.eid)),
       parse: SlotsZ,
       effort: "medium",
+      label: "regenerate",
     });
     const v = validateBrief({ ...b.data, ...r.data }, docs, org.serviceCatalog);
     if (!v.hookFailed) {

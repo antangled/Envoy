@@ -18,6 +18,7 @@ export async function buildSpec(goal: string, mode: "client" | "partnership", or
     ],
     schema: searchSpecSchema,
     parse: SearchSpecZ,
+    label: "spec",
     maxTokens: 3000,
   });
   const spec = r.data;

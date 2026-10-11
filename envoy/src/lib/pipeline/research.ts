@@ -35,6 +35,7 @@ async function aiBrief(org: OrgRow, c: Campaign, p: Prospect, docs: EvidenceDoc[
     model,
     effort: "high",
     maxTokens: 12000,
+    label: model === MODELS.strong ? "brief:sonnet" : "brief",
   });
 }
 
@@ -48,6 +49,7 @@ async function verify(b: BriefAndSlots, docs: EvidenceDoc[], c: Campaign, log: s
     parse: VerdictsZ,
     effort: "low",
     maxTokens: 3000,
+    label: "verifier",
   });
   return applyVerdicts(b, r.data.verdicts, log);
 }

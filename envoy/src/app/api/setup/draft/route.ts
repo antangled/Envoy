@@ -86,7 +86,7 @@ ${base.client}
 Partnership email template:
 ${base.partnership}`,
   });
-  const r = await callStructured({ system: SYSTEM, content, schema, parse: Out, maxTokens: 6000, effort: "medium" });
+  const r = await callStructured({ system: SYSTEM, content, schema, parse: Out, maxTokens: 6000, effort: "medium", label: "setup-draft" });
   const d = r.data;
   // Never accept a version that lost or invented a token.
   const keep = (orig: string, next: string) => (tokens(orig) === tokens(next) && next.trim() ? next.trim() : orig);

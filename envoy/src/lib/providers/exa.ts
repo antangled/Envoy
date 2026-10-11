@@ -30,10 +30,12 @@ function citationFor(grounding: { field: string; citations: { url: string }[] }[
   return grounding?.find((g) => g.field === field)?.citations?.[0]?.url ?? null;
 }
 
-async function runAgent<T>(params: Parameters<ReturnType<typeof exa>["agent"]["runs"]["create"]>[0] & { effort: "low" }) {
+async function runAgent<T>(params: Parameters<ReturnType<typeof exa>["agent"]["runs"]["create"]>[0] & { effort: "low" }, label: string) {
   try {
+    const started = Date.now();
     const run = await exa().agent.runs.createAndWait(params, WAIT);
-    recordExa(run.costDollars?.total as number | undefined);
+    const items = Object.values((run.output?.structured as Record<string, unknown[]> | undefined) ?? {})[0];
+    recordExa(run.costDollars?.total as number | undefined, label, { cost: run.costDollars, items: Array.isArray(items) ? items.length : null, ms: Date.now() - started });
     return { structured: run.output?.structured as T | undefined, grounding: run.output?.grounding ?? null, cost: run.costDollars };
   } catch (e) {
     const run = (e as { run?: { status?: string; error?: { message?: string } } }).run;
@@ -80,7 +82,7 @@ export async function findOrganizations(args: {
       },
       required: ["organizations"],
     },
-  });
+  }, "agent:organizations");
   return (r.structured?.organizations ?? []).map((o, i) => {
     const domain = normalizeDomain(o.website);
     return { name: o.name, domain, website: `https://${domain}`, reason: o.reason, reasonUrl: citationFor(r.grounding, `organizations[${i}].reason`) };
@@ -125,7 +127,7 @@ export async function findPeople(orgs: { name: string; domain: string }[], roles
       },
       required: ["people"],
     },
-  });
+  }, "agent:people");
   return (r.structured?.people ?? []).map((p, i) => ({
     domain: normalizeDomain(p.domain),
     name: p.name.trim(),
@@ -138,7 +140,7 @@ export async function findPeople(orgs: { name: string; domain: string }[], roles
 /** Known URLs → page text. The 4,000-character cap is the per-page evidence budget for the brief. */
 export async function contents(urls: string[]) {
   const res = await exa().getContents(urls, { text: { maxCharacters: 4000 } });
-  recordExa((res as { costDollars?: { total?: number } }).costDollars?.total);
+  recordExa((res as { costDollars?: { total?: number } }).costDollars?.total, "contents", { urls: urls.length });
   return res.results.filter((r) => r.text && r.text.length > 200).map((r) => ({ url: r.url, title: r.title || r.url, text: r.text }));
 }
 
@@ -149,7 +151,7 @@ export async function recentNews(companyName: string, domain: string) {
     numResults: 5,
     contents: { highlights: true },
   });
-  recordExa((res as { costDollars?: { total?: number } }).costDollars?.total);
+  recordExa((res as { costDollars?: { total?: number } }).costDollars?.total, "search:news", { results: res.results.length });
   const key = companyName.toLowerCase().split(/\s+/)[0];
   return res.results
     .map((r) => ({ url: r.url, title: r.title || r.url, text: (r.highlights ?? []).join("\n"), publishedDate: r.publishedDate }))

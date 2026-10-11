@@ -139,7 +139,7 @@ export async function findContacts(args: { domain: string; roles: string[]; evid
   const haveGoodNamed = out.some((c) => c.name && isSendable(c.emailStatus) && c.score >= 0.4);
   if (team && llmAvailable() && !haveGoodNamed) {
     try {
-      const r = await callStructured({ system: TEAM_SYSTEM, content: [textDoc(team.text.slice(0, 8000), team.url), { type: "text", text: "List the people." }], schema: teamPeopleSchema, parse: TeamPeopleZ, maxTokens: 2000, effort: "low" });
+      const r = await callStructured({ system: TEAM_SYSTEM, content: [textDoc(team.text.slice(0, 8000), team.url), { type: "text", text: "List the people." }], schema: teamPeopleSchema, parse: TeamPeopleZ, maxTokens: 2000, effort: "low", label: "team-page" });
       const ranked = r.data.people.map((p) => ({ ...p, score: titleScore(p.title, roles) })).sort((a, b) => b.score - a.score).slice(0, 2);
       for (const p of ranked) {
         const [first, ...rest] = p.name.split(/\s+/);

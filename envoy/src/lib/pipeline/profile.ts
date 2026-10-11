@@ -22,6 +22,6 @@ export async function extractProfile(input: { deckB64?: string | null; website?:
   }
   if (!content.length) throw new Error("Couldn't read the deck or website. Check the URL, or upload a PDF.");
   content.push({ type: "text", text: "Extract the organization profile." });
-  const r = await callStructured({ system: PROFILE_SYSTEM, content, schema: orgProfileSchema, parse: OrgProfileZ, model: MODELS.fast, maxTokens: 4000 });
+  const r = await callStructured({ system: PROFILE_SYSTEM, content, schema: orgProfileSchema, parse: OrgProfileZ, model: MODELS.fast, maxTokens: 4000, label: "profile" });
   return { profile: r.data, source: sources.join("+") };
 }
