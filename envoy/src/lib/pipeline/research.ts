@@ -9,7 +9,9 @@ import { heuristicBrief } from "@/lib/llm/heuristic";
 import { forModel, gatherEvidence } from "./evidence";
 import { findContacts, isSendable } from "./contacts";
 import { renderDraft, upsertDraft } from "./draft";
-import { templatesFor, type OrgRow } from "./org";
+import { signatureFor, templatesFor, type OrgRow } from "./org";
+import { recordSonnetBrief } from "@/lib/usage";
+import { fillMine, meFrom } from "@/lib/template/render";
 import type { ExaPerson } from "@/lib/providers/exa";
 
 type Campaign = typeof schema.campaigns.$inferSelect;
@@ -25,7 +27,7 @@ async function aiBrief(org: OrgRow, c: Campaign, p: Prospect, docs: EvidenceDoc[
       ...docs.map((d) => textDoc(d.text, d.url, `evidence id ${d.eid} (${d.title})`)),
       {
         type: "text",
-        text: `Target company: ${p.name} (${p.domain})\nSender's goal: ${c.goalText}\nCriteria:\n${criteriaText}\nRoles the sender wants to reach: ${c.rolesSelected.join(", ")}\n\nThe sender's email template. Your hook replaces {{ai_opening}} and must read naturally with the words around it; your ideas replace {{ai_ideas}}:\n---\n${templatesFor(org)[c.mode as "client" | "partnership"]}\n---\nProduce the brief and slots.`,
+        text: `Target company: ${p.name} (${p.domain})\nSender's goal: ${c.goalText}\nCriteria:\n${criteriaText}\nRoles the sender wants to reach: ${c.rolesSelected.join(", ")}\n\nThe sender's email template. Your hook replaces {{ai_opening}} and must read naturally with the words around it; your ideas replace {{ai_ideas}}:\n---\n${fillMine(templatesFor(org)[c.mode as "client" | "partnership"], meFrom(signatureFor(org)))}\n---\nProduce the brief and slots.`,
       },
     ],
     schema: briefSchema(docs.map((d) => d.eid), spec.criteria.map((x) => x.id)),
@@ -86,8 +88,11 @@ export async function researchProspect(org: OrgRow, c: Campaign, prospect: Prosp
     let r = await aiBrief(org, c, p, docs, MODELS.fast);
     let v = validateBrief(r.data, docs, org.serviceCatalog);
     modelUsed = r.model;
-    v.problems += await verify(v.brief, docs, c, v.log).catch((e) => (v.log.push(`verifier skipped: ${e.message}`), 0));
-    if (v.hookFailed || v.problems > 1) {
+    // The fact-checker's downgrades are corrections already applied to the brief, so they don't justify a rewrite.
+    // Escalate only when the brief itself is broken: an opening with no verifiable quote, or invalid structure.
+    await verify(v.brief, docs, c, v.log).catch((e) => (v.log.push(`verifier skipped: ${e.message}`), 0));
+    if (v.hookFailed || v.problems > 2) {
+      recordSonnetBrief();
       v.log.push(`escalated to ${MODELS.strong} after ${v.problems} problem(s)`);
       emit({ prospectId: p.id, stage: "briefing", detail: "Double-checking with a stronger model" });
       const prevLog = v.log;
@@ -116,11 +121,11 @@ export async function researchProspect(org: OrgRow, c: Campaign, prospect: Prosp
   emit({ prospectId: p.id, stage: "contacts", detail: "Finding the right person" });
   const roles = [...new Set([...c.rolesSelected, ...brief.recommended_roles])];
   const exaPeople = (await people).filter((x) => x.domain === p.domain || x.domain.endsWith("." + p.domain));
-  const found = await findContacts({ domain: p.domain, roles, evidence: rows, website: p.website, exaPeople });
+  const found = await findContacts({ domain: p.domain, roles, evidence: rows, website: p.website, exaPeople, limit: c.peoplePerCompany });
   await db.delete(schema.contacts).where(eq(schema.contacts.prospectId, p.id));
   const inserted = await db
     .insert(schema.contacts)
-    .values(found.map((f, i) => ({ prospectId: p.id, name: f.name, firstName: f.firstName, lastName: f.lastName, title: f.title, email: f.email, emailStatus: f.emailStatus, confidence: f.confidence, source: f.source, sourceUrl: f.sourceUrl, linkedinUrl: f.linkedinUrl, isPrimary: i === 0 })))
+    .values(found.map((f, i) => ({ prospectId: p.id, name: f.name, firstName: f.firstName, lastName: f.lastName, title: f.title, email: f.email, emailStatus: f.emailStatus, confidence: f.confidence, source: f.source, sourceUrl: f.sourceUrl, linkedinUrl: f.linkedinUrl, isPrimary: i === 0, selected: i === 0 && isSendable(f.emailStatus) })))
     .returning();
   const primary = inserted.find((x) => x.isPrimary) ?? null;
   await setStatus("contacted");

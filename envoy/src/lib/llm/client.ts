@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import type { ZodType } from "zod";
 import { secret } from "@/lib/env";
+import { recordClaude } from "@/lib/usage";
 
 export const MODELS = { fast: "claude-haiku-5-5", strong: "claude-sonnet-5-5" } as const;
 
@@ -64,6 +65,7 @@ async function once<T>(req: StructuredCall<T>, model: string): Promise<Structure
     output_config: { effort: req.effort ?? "medium", format: { type: "json_schema", schema: req.schema } },
   });
   if (msg.stop_reason === "refusal") throw new RefusalError("Model declined this request");
+  recordClaude(model, { input: msg.usage.input_tokens, output: msg.usage.output_tokens, cacheRead: msg.usage.cache_read_input_tokens ?? 0 });
   const text = msg.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
   let json: unknown;
   try {

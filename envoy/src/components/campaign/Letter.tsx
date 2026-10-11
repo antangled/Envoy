@@ -1,6 +1,6 @@
 "use client";
 import { EmailView } from "@/components/EmailView";
-import { renderBody, renderSubject } from "@/lib/template/render";
+import { meFrom, renderBody, renderSubject } from "@/lib/template/render";
 import type { Brief, Bundle, Contact, Draft } from "./types";
 
 export function Letter({ b, brief, contact, draft, companyName, onCite }: { b: Bundle; brief: Brief; contact: Contact | undefined; draft: Draft; companyName: string; onCite: (eid: string) => void }) {
@@ -9,7 +9,7 @@ export function Letter({ b, brief, contact, draft, companyName, onCite }: { b: B
   if (draft.userEdited) {
     return <EmailView subject={draft.subject} bodyText={draft.body} signature={b.org.signature} company={companyName} attachment={attachment} showSubject={false} />;
   }
-  const ctx = { company: companyName, firstName: contact?.firstName ?? null, slots: { hook: brief.data.hook, ideas: brief.data.ideas } };
+  const ctx = { company: companyName, firstName: contact?.firstName ?? null, me: meFrom(b.org.signature), slots: { hook: brief.data.hook, ideas: brief.data.ideas } };
   return (
     <EmailView
       subject={draft.subject || renderSubject(b.org.templates.subject, ctx)}

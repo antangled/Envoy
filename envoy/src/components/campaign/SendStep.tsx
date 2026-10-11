@@ -4,18 +4,18 @@ import { Badge, Button, Notice } from "@/components/ui";
 import { api } from "@/lib/client/api";
 import { footerText } from "@/lib/template/render";
 import { ContactBadge } from "./bits";
-import { canSend, type Bundle } from "./types";
+import { recipientsFor, type Bundle } from "./types";
 
 export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ queued: number; skipped: string[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const queuedDraftIds = new Set(b.sends.map((s) => s.draftId));
+  const queued = new Set(b.sends.map((s) => `${s.draftId}:${s.toEmail}`));
   const pending = b.drafts
-    .filter((d) => d.status === "selected" && !queuedDraftIds.has(d.id))
-    .map((d) => ({ d, p: b.prospects.find((x) => x.id === d.prospectId)!, c: b.contacts.find((x) => x.id === d.contactId) }))
-    .filter((x) => canSend(x.c, x.d));
+    .filter((d) => d.status === "selected")
+    .flatMap((d) => recipientsFor(b, d).map((c) => ({ d, p: b.prospects.find((x) => x.id === d.prospectId)!, c })))
+    .filter((x) => !queued.has(`${x.d.id}:${x.c.email?.toLowerCase()}`));
   const scheduled = b.sends.filter((s) => s.status === "scheduled");
   const live = b.gmailConnected;
   const reloadRef = useRef(reload);
@@ -63,7 +63,7 @@ export function SendStep({ b, reload }: { b: Bundle; reload: () => Promise<void>
             <h2 className="mb-3 font-serif text-[22px] font-medium">Ready to send</h2>
             <ul className="divide-y divide-rule rounded-xl border border-rule bg-surface">
               {pending.map(({ d, p, c }) => (
-                <li key={d.id} className="flex items-start gap-3 px-4 py-3">
+                <li key={`${d.id}:${c.id}`} className="flex items-start gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{p.name}</p>
                     <p className="break-all text-[14px] text-ink-2">{c?.name ? `${c.name}, ` : ""}{c?.email}</p>

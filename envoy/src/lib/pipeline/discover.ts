@@ -47,7 +47,7 @@ export async function discover(c: Campaign): Promise<{ added: number; source: "e
   }
   if (rows.length) await db.insert(schema.prospects).values(rows).onConflictDoNothing();
   const shortfall: string[] = [];
-  if (rows.length < c.contactCount) shortfall.push(`Found ${rows.length} organizations for ${c.contactCount} requested.`);
+  if (rows.length < c.contactCount) shortfall.push(`Found ${rows.length} ${rows.length === 1 ? "organization" : "organizations"} for ${c.contactCount} requested.`);
   if (excluded) shortfall.push(`${excluded} skipped because you've already contacted them.`);
   await db.update(schema.campaigns).set({ status: "targets", shortfall }).where(eq(schema.campaigns.id, c.id));
   return { added: rows.length, source, shortfall };

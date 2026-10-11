@@ -1,11 +1,11 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Notice } from "@/components/ui";
 import { useStatus } from "@/components/status";
 import { api } from "@/lib/client/api";
 import { ContactBadge, CONTACT_LABEL, CriteriaDots, Cites, FitScore } from "./bits";
 import { Letter } from "./Letter";
-import { canSend, type Bundle, type Prospect } from "./types";
+import { recipientsFor, type Bundle, type Prospect } from "./types";
 
 export type ProgressMap = Record<number, { stage: string; detail?: string }>;
 
@@ -13,7 +13,7 @@ export function ReviewStep({ b, reload, progress, running, onContinue }: { b: Bu
   const list = b.prospects.filter((p) => p.selected);
   const [activeId, setActiveId] = useState<number | null>(null);
   const active = list.find((p) => p.id === activeId) ?? list.find((p) => b.drafts.some((d) => d.prospectId === p.id)) ?? list[0];
-  const selectedCount = b.drafts.filter((d) => d.status === "selected" && canSend(b.contacts.find((c) => c.id === d.contactId), d)).length;
+  const selectedCount = b.drafts.filter((d) => d.status === "selected").reduce((n, d) => n + recipientsFor(b, d).length, 0);
   const ready = list.filter((p) => b.drafts.some((d) => d.prospectId === p.id)).length;
 
   return (
@@ -55,7 +55,7 @@ function ProspectRow({ p, b, active, progress, onClick }: { p: Prospect; b: Bund
             {!working && !brief && p.status !== "skipped" && <span>Waiting</span>}
           </p>
         </div>
-        {brief && <div className="flex flex-col items-end gap-1"><FitScore score={brief.data.fit_score} />{draft?.status === "selected" && canSend(contact, draft) && <span className="text-[11px] font-semibold text-seal">Send</span>}</div>}
+        {brief && <div className="flex flex-col items-end gap-1"><FitScore score={brief.data.fit_score} />{draft?.status === "selected" && recipientsFor(b, draft).length > 0 && <span className="text-[11px] font-semibold text-seal">Send to {recipientsFor(b, draft).length}</span>}</div>}
       </button>
     </li>
   );
@@ -71,6 +71,24 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<string | null>(null);
+  const [lookupMsg, setLookupMsg] = useState<string | null>(null);
+  const toggleContact = async (id: number, selected: boolean) => {
+    setBusy(`c${id}`);
+    try { await api(`/api/contacts/${id}`, { method: "PATCH", json: { selected } }); await reload(); } finally { setBusy(null); }
+  };
+  const findEmail = async (id: number) => {
+    setBusy(`e${id}`);
+    setLookupMsg(null);
+    try {
+      const r = await api<{ found: boolean; email?: string }>(`/api/contacts/${id}/email`, { method: "POST" });
+      setLookupMsg(r.found ? `Found ${r.email}. Tick the box to add them.` : "Hunter couldn't find an email for this person. No credit was used.");
+      await reload();
+    } catch (e) {
+      setLookupMsg((e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const sourceNums = useMemo(() => Object.entries(brief?.sources ?? {}).sort((a, b2) => Number(a[0].slice(1)) - Number(b2[0].slice(1))), [brief]);
   const onCite = (eid: string) => {
@@ -93,7 +111,8 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
     );
   }
   const d = brief.data;
-  const sendable = canSend(contact, draft);
+  const recipients = recipientsFor(b, draft);
+  const sendable = recipients.length > 0;
   const critText = new Map((b.campaign.searchSpec?.criteria ?? []).map((c) => [c.id, c.text]));
 
   return (
@@ -149,28 +168,50 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
       </div>
 
       <section className="rounded-xl border border-rule bg-surface p-5">
-        <h3 className="mb-3 text-[15px] font-semibold">Who to write to</h3>
-        <ul className="space-y-2">
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="text-[15px] font-semibold">Who to write to</h3>
+          <span className="text-[13px] text-ink-2 tabular-nums">
+            {contacts.filter((c) => c.name).length} people found · {recipients.length} will get this email
+          </span>
+        </div>
+        <ul className="divide-y divide-rule rounded-lg border border-rule">
           {contacts.map((c) => {
-            const chosen = c.id === draft.contactId;
+            const previewing = c.id === draft.contactId;
+            const generic = c.emailStatus === "published_generic";
+            const canPick = !!c.email && (generic ? draft.allowGeneric : c.emailStatus !== "not_found");
+            const picked = recipients.some((r) => r.id === c.id);
             return (
-              <li key={c.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 ${chosen ? "bg-carbon" : ""}`}>
-                <ContactBadge status={c.emailStatus} named={!!c.name} />
+              <li key={c.id} className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 ${previewing ? "bg-carbon" : ""}`}>
+                <input
+                  type="checkbox"
+                  aria-label={`Send to ${c.name || c.email || "this contact"}`}
+                  disabled={!canPick || busy === `c${c.id}`}
+                  checked={picked}
+                  onChange={(e) => toggleContact(c.id, e.target.checked)}
+                  className="h-4 w-4 accent-[var(--seal)] disabled:opacity-40"
+                />
+                <ContactBadge status={c.emailStatus} named={!!c.name} checked={c.confidence !== null} />
                 <span className="font-semibold">{c.name || (c.emailStatus === "not_found" ? `No named contact. Try: ${c.title}` : "Company address")}</span>
                 {c.title && c.name && <span className="text-[14px] text-ink-2">{c.title}</span>}
                 {c.email && <span className="text-[14px] tabular-nums">{c.email}</span>}
-                {c.sourceUrl && <a className="text-[13px] text-link hover:underline" href={c.sourceUrl} target="_blank" rel="noreferrer">{c.emailStatus === "not_found" && !c.name ? "Contact page" : "Source"}</a>}
-                {c.linkedinUrl && <a className="text-[13px] text-link hover:underline" href={c.linkedinUrl} target="_blank" rel="noreferrer">LinkedIn</a>}
-                {!chosen && c.email && <button className="ml-auto text-[13px] text-link hover:underline" onClick={() => patch({ contactId: c.id }, "contact")}>Write to this person</button>}
+                {!c.email && c.name && c.confidence === null && status?.integrations.hunter && (
+                  <Button variant="ghost" className="text-[13px]" busy={busy === `e${c.id}`} onClick={() => findEmail(c.id)}>Find email</Button>
+                )}
+                <span className="ml-auto flex items-center gap-3 text-[13px]">
+                  {c.sourceUrl && <a className="text-link hover:underline" href={c.sourceUrl} target="_blank" rel="noreferrer">{c.emailStatus === "not_found" && !c.name ? "Contact page" : "Source"}</a>}
+                  {c.linkedinUrl && <a className="text-link hover:underline" href={c.linkedinUrl} target="_blank" rel="noreferrer">LinkedIn</a>}
+                  {!previewing && c.email && <button className="text-link hover:underline" onClick={() => patch({ contactId: c.id }, "contact")}>Preview</button>}
+                </span>
               </li>
             );
           })}
         </ul>
-        {contact && <p className="mt-2 text-[13px] text-ink-2">{contact.emailStatus === "not_found" && contact.name ? `${contact.name} was found, but no email address for them was. Add your Hunter key to look it up, or find it yourself and edit the draft.` : CONTACT_LABEL[contact.emailStatus].help}</p>}
-        {contact?.emailStatus === "published_generic" && (
+        {lookupMsg && <p className="mt-2 text-[13px] text-ink-2">{lookupMsg}</p>}
+        <p className="mt-2 text-[13px] text-ink-2">Tick everyone who should get this email; each person gets their own copy, greeted by name. {contact && CONTACT_LABEL[contact.emailStatus].help}</p>
+        {contacts.some((c) => c.emailStatus === "published_generic") && (
           <label className="mt-2 flex items-center gap-2 text-[14px]">
             <input type="checkbox" checked={draft.allowGeneric} onChange={(e) => patch({ allowGeneric: e.target.checked }, "generic")} className="h-4 w-4 accent-[var(--ink)]" />
-            Send to this shared inbox anyway
+            Allow sending to shared inboxes (info@, press@) at this company
           </label>
         )}
         {!status?.integrations.hunter && <p className="mt-2 text-[12px] text-ink-3">Demo mode: only addresses published on the company&rsquo;s site. Add your Hunter key in envoy/.env.local to find named people by title.</p>}
@@ -191,20 +232,32 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
         </div>
         <div className="border-t border-rule bg-[color-mix(in_oklab,var(--surface),var(--paper)_40%)] px-6 py-6 sm:px-10">
           {editing ? (
-            <textarea aria-label="Email body" className="field letter min-h-[420px]" value={body} onChange={(e) => setBody(e.target.value)} />
+            <AutoGrow value={body} onChange={setBody} />
           ) : (
-            <Letter b={b} brief={brief} contact={contact} draft={draft} companyName={p.name} onCite={onCite} />
+            <div
+              role="button"
+              tabIndex={0}
+              title="Click to edit this email"
+              onClick={(e) => { if ((e.target as HTMLElement).closest("a,button")) return; setBody(draft.body); setEditing(true); }}
+              onKeyDown={(e) => { if (e.key === "Enter") { setBody(draft.body); setEditing(true); } }}
+              className="-m-3 cursor-text rounded-lg p-3 outline-offset-2 transition-colors hover:bg-sunken/60"
+            >
+              <Letter b={b} brief={brief} contact={contact} draft={draft} companyName={p.name} onCite={onCite} />
+            </div>
           )}
           
         </div>
         <div className="flex flex-wrap items-center gap-3 border-t border-rule px-5 py-3">
           {editing ? (
             <>
-              <Button busy={busy === "body"} onClick={async () => { await patch({ body }, "body"); setEditing(false); }}>Save text</Button>
+              <Button busy={busy === "body"} onClick={async () => { await patch({ body }, "body"); setEditing(false); }}>Save changes</Button>
               <Button variant="quiet" onClick={() => { setBody(draft.body); setEditing(false); }}>Cancel</Button>
             </>
           ) : (
-            <Button variant="quiet" onClick={() => { setBody(draft.body); setEditing(true); }}>Edit text</Button>
+            <>
+              <Button variant="quiet" onClick={() => { setBody(draft.body); setEditing(true); }}>Edit this email</Button>
+              <span className="text-[13px] text-ink-3">or click anywhere in it. Add anything specific to {p.name}.</span>
+            </>
           )}
           {(status?.integrations.anthropic || draft.userEdited) && (
             <Button variant="ghost" busy={busy === "regen"} onClick={async () => { setBusy("regen"); try { await api(`/api/drafts/${draft.id}/regenerate`, { method: "POST" }); await reload(); setEditing(false); } finally { setBusy(null); } }}>
@@ -239,4 +292,16 @@ function Dossier({ p, b, reload, progress }: { p: Prospect; b: Bundle; reload: (
       </section>
     </article>
   );
+}
+
+/** Editing a single draft: the whole email in one box that grows with its text. */
+function AutoGrow({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [value]);
+  return <textarea ref={ref} autoFocus aria-label="Email body" className="field letter resize-none overflow-hidden" value={value} onChange={(e) => onChange(e.target.value)} />;
 }

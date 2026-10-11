@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useStatus } from "./status";
 import { api } from "@/lib/client/api";
+import { Logo } from "./Logo";
 
 const NAV = [
   { href: "/campaigns", label: "Campaigns" },
@@ -24,8 +25,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <header className="border-b border-rule bg-surface">
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-x-8 gap-y-2 px-5 py-3">
           <Link href={user ? "/campaigns" : "/"} className="flex items-center gap-2.5">
-            <Seal />
-            <span className="font-serif text-[22px] font-semibold tracking-[-0.01em]">Envoy</span>
+            <Logo />
           </Link>
           {user && (
             <nav className="flex gap-1" aria-label="Main">
@@ -65,14 +65,5 @@ export function Shell({ children }: { children: React.ReactNode }) {
       </header>
       <main className="mx-auto max-w-[1180px] px-5 py-10">{children}</main>
     </div>
-  );
-}
-
-export function Seal({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden className="shrink-0">
-      <path d="M16 2.5c2 0 2.6 1.7 4.4 2.2 1.9.5 3.5-.4 4.8.9 1.3 1.3.4 2.9.9 4.8.5 1.8 2.2 2.4 2.2 4.4s-1.7 2.6-2.2 4.4c-.5 1.9.4 3.5-.9 4.8-1.3 1.3-2.9.4-4.8.9-1.8.5-2.4 2.2-4.4 2.2s-2.6-1.7-4.4-2.2c-1.9-.5-3.5.4-4.8-.9-1.3-1.3-.4-2.9-.9-4.8C4.4 18.6 2.7 18 2.7 16s1.7-2.6 2.2-4.4c.5-1.9-.4-3.5.9-4.8 1.3-1.3 2.9-.4 4.8-.9C12.4 4.2 14 2.5 16 2.5Z" fill="var(--seal)" />
-      <path d="M11 11h10M11 16h7M11 21h10" stroke="var(--on-seal)" strokeWidth="2" strokeLinecap="round" />
-    </svg>
   );
 }

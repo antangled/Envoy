@@ -2,7 +2,7 @@
 
 /*
   Envoy — a letter of introduction backed by a dossier.
-  Cool paper, navy ink, one wax-seal accent reserved for sending. Generated text is shown as a carbon-copy tint.
+  Cool paper, navy ink, and the brand's royal navy as the one accent, reserved for sending. Generated text is shown as a carbon-copy tint.
 */
 :root {
   --paper: #f3f5f8;
@@ -12,8 +12,9 @@
   --ink-2: #4e5a6b;
   --ink-3: #7a8596;
   --rule: #d8dee6;
-  --seal: #8e1f2e;
-  --seal-hover: #761826;
+  --brand: #1c2a87;
+  --seal: #1c2a87;
+  --seal-hover: #15206b;
   --on-seal: #ffffff;
   --link: #2b4c8c;
   --carbon: #e3ebf8;
@@ -36,9 +37,10 @@
     --ink-2: #a2adbc;
     --ink-3: #758195;
     --rule: #2a3442;
-    --seal: #c4495b;
-    --seal-hover: #d35b6c;
-    --on-seal: #ffffff;
+    --brand: #8c9bff;
+    --seal: #8c9bff;
+    --seal-hover: #a3afff;
+    --on-seal: #0f141c;
     --link: #93b3f2;
     --carbon: #1f2c44;
     --carbon-line: #4f6fa8;
@@ -61,6 +63,7 @@
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-rule: var(--rule);
+  --color-brand: var(--brand);
   --color-seal: var(--seal);
   --color-seal-hover: var(--seal-hover);
   --color-on-seal: var(--on-seal);
@@ -149,3 +152,13 @@ h1, h2, h3 { text-wrap: balance; }
 .editor-layer mark.text-ok { color: var(--ok); }
 .editor-layer mark.text-link { color: var(--link); }
 .editor-layer mark.text-bad { color: var(--bad); }
+
+@keyframes shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+.shimmer {
+  background: linear-gradient(90deg, var(--sunken) 0%, var(--muted-bg) 40%, var(--sunken) 80%);
+  background-size: 800px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes fade-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.fade-up { animation: fade-up 420ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .shimmer, .fade-up { animation: none; } }

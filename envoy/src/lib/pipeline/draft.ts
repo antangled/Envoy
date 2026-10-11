@@ -1,7 +1,7 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { draftText, renderBody, renderSubject, type Mode } from "@/lib/template/render";
+import { draftText, meFrom, renderBody, renderSubject, type Mode } from "@/lib/template/render";
 import type { BriefAndSlots } from "@/lib/llm/schemas";
 import { signatureFor, templatesFor, type OrgRow } from "./org";
 
@@ -10,8 +10,9 @@ type Contact = typeof schema.contacts.$inferSelect;
 
 export function renderDraft(org: OrgRow, c: Campaign, companyName: string, contact: Contact | null, brief: BriefAndSlots) {
   const t = templatesFor(org);
-  const ctx = { company: companyName, firstName: contact?.firstName ?? null, slots: { hook: brief.hook, ideas: brief.ideas } };
-  return { subject: renderSubject(t.subject, ctx), body: draftText(renderBody(t[c.mode as Mode], ctx), signatureFor(org)) };
+  const sig = signatureFor(org);
+  const ctx = { company: companyName, firstName: contact?.firstName ?? null, me: meFrom(sig), slots: { hook: brief.hook, ideas: brief.ideas } };
+  return { subject: renderSubject(t.subject, ctx), body: draftText(renderBody(t[c.mode as Mode], ctx), sig) };
 }
 
 export async function upsertDraft(prospectId: number, contactId: number | null, subject: string, body: string, selected: boolean) {

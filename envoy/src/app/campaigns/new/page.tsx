@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button, Label, Notice, PageTitle } from "@/components/ui";
 import { api } from "@/lib/client/api";
 import { useStatus } from "@/components/status";
+import { FindingProgress } from "@/components/FindingProgress";
 
 const EXAMPLES = {
   client: "We want three fall consulting projects with growth-stage clean-energy hardware companies in the Bay Area that are scaling manufacturing or launching a new product line.",
@@ -16,6 +17,8 @@ export default function NewCampaign() {
   const [mode, setMode] = useState<"client" | "partnership">("client");
   const [goal, setGoal] = useState("");
   const [count, setCount] = useState(10);
+  const [people, setPeople] = useState(10);
+  const [phase, setPhase] = useState<"goal" | "search" | null>(null);
   const [attach, setAttach] = useState(true);
   const [geo, setGeo] = useState("");
   const [size, setSize] = useState("");
@@ -35,15 +38,20 @@ export default function NewCampaign() {
     e.preventDefault();
     setBusy(true);
     setErr(null);
+    setPhase("goal");
     try {
-      const { id } = await api<{ id: number }>("/api/campaigns", { method: "POST", json: { mode, goalText: goal, contactCount: count, attachDeck: attach && hasDeck !== false, advanced: { geography: geo, sizeHint: size, extraCriteria: extra } } });
+      const { id } = await api<{ id: number }>("/api/campaigns", { method: "POST", json: { mode, goalText: goal, contactCount: count, peoplePerCompany: people, attachDeck: attach && hasDeck !== false, advanced: { geography: geo, sizeHint: size, extraCriteria: extra } } });
+      setPhase("search");
       await api(`/api/campaigns/${id}/discover`, { method: "POST" });
       router.push(`/campaigns/${id}`);
     } catch (e) {
       setErr((e as Error).message);
       setBusy(false);
+      setPhase(null);
     }
   }
+
+  if (phase) return <FindingProgress phase={phase} live={liveSearch} />;
 
   return (
     <form onSubmit={submit} className="max-w-[720px]">
@@ -71,6 +79,10 @@ export default function NewCampaign() {
         <div>
           <Label htmlFor="count" hint="Envoy returns fewer if it can't find enough good fits.">How many organizations</Label>
           <input id="count" type="number" min={1} max={50} className="field max-w-[120px]" value={count} onChange={(e) => setCount(Number(e.target.value))} />
+        </div>
+        <div>
+          <Label htmlFor="people" hint="Several people per role are fine. Emails are looked up only for the people you choose.">People per company</Label>
+          <input id="people" type="number" min={1} max={20} className="field max-w-[120px]" value={people} onChange={(e) => setPeople(Number(e.target.value))} />
         </div>
         <div>
           <span className="mb-1.5 block text-[14px] font-semibold">Your deck</span>

@@ -18,7 +18,7 @@ export async function campaignBundle(userId: number, id: number) {
   const [briefs, contacts, drafts, sends] = ids.length
     ? await Promise.all([
         db.select().from(schema.briefs).where(inArray(schema.briefs.prospectId, ids)),
-        db.select().from(schema.contacts).where(inArray(schema.contacts.prospectId, ids)),
+        db.select().from(schema.contacts).where(inArray(schema.contacts.prospectId, ids)).orderBy(schema.contacts.id),
         db.select().from(schema.drafts).where(inArray(schema.drafts.prospectId, ids)),
         db.select().from(schema.sends).where(eq(schema.sends.campaignId, id)).orderBy(desc(schema.sends.scheduledAt)),
       ])

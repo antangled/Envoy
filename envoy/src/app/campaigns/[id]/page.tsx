@@ -90,6 +90,7 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
       <div className="mb-6">
         <p className="text-[13px] text-ink-2">{b.campaign.mode === "partnership" ? "Partnership" : "Client outreach"}</p>
         <h1 className="mt-1 max-w-[70ch] font-serif text-[20px] font-medium leading-snug sm:text-[26px]">{b.campaign.goalText}</h1>
+        <Spend u={b.campaign.usage} companies={b.briefs.length} />
       </div>
       <ol className="mb-8 flex flex-wrap gap-2" aria-label="Campaign steps">
         {STEPS.map((s, i) => {
@@ -116,5 +117,21 @@ export default function CampaignPage({ params }: { params: Promise<{ id: string 
       {step === "review" && <ReviewStep b={b} reload={reload} progress={progress} running={running} onContinue={() => { setStep("send"); window.scrollTo({ top: 0 }); }} />}
       {step === "send" && <SendStep b={b} reload={reload} />}
     </div>
+  );
+}
+
+/** What this campaign has cost so far, so spend is never a surprise. */
+function Spend({ u, companies }: { u: { claudeUsd: number; exaUsd: number; hunterLookups: number; sonnetBriefs: number } | undefined; companies: number }) {
+  if (!u) return null;
+  const total = (u.claudeUsd ?? 0) + (u.exaUsd ?? 0);
+  if (!total && !u.hunterLookups) return null;
+  const money = (n: number) => (n < 0.01 ? "under $0.01" : `$${n.toFixed(2)}`);
+  return (
+    <p className="mt-2 text-[13px] text-ink-2 tabular-nums" title="List prices. Hunter lookups come out of your Hunter plan's monthly allowance.">
+      Spent so far: <span className="font-semibold text-ink">{money(total)}</span>
+      {" "}(AI writing {money(u.claudeUsd ?? 0)}, company and people search {money(u.exaUsd ?? 0)})
+      {" · "}{u.hunterLookups ?? 0} email lookup{u.hunterLookups === 1 ? "" : "s"}
+      {companies > 0 && total > 0 && <> · about {money(total / companies)} per company</>}
+    </p>
   );
 }

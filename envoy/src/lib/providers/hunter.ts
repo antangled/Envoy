@@ -2,6 +2,7 @@ import "server-only";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import { secret } from "@/lib/env";
+import { recordHunter } from "@/lib/usage";
 
 export const hunterAvailable = () => !!secret("HUNTER_API_KEY");
 
@@ -32,6 +33,7 @@ async function cached<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const [row] = await db.select().from(schema.hunterCache).where(eq(schema.hunterCache.key, key));
   if (row && Date.now() - row.createdAt.getTime() < TTL_MS) return row.data as T;
   const data = await fn();
+  recordHunter();
   await db
     .insert(schema.hunterCache)
     .values({ key, data: data as object })

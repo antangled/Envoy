@@ -50,7 +50,7 @@ function statusFromHunter(p: HunterPerson, acceptAll: boolean): ContactStatus {
   return "unknown";
 }
 
-export async function findContacts(args: { domain: string; roles: string[]; evidence: EvidenceRow[]; website: string; exaPeople?: ExaPerson[] }): Promise<ContactDraft[]> {
+export async function findContacts(args: { domain: string; roles: string[]; evidence: EvidenceRow[]; website: string; exaPeople?: ExaPerson[]; limit?: number }): Promise<ContactDraft[]> {
   const { domain, roles, evidence } = args;
   const out: ContactDraft[] = [];
 
@@ -83,9 +83,12 @@ export async function findContacts(args: { domain: string; roles: string[]; evid
     }
   }
 
-  // A2. People Exa confirmed in the target roles. Hunter supplies the email when its key is set.
+  // A2. People Exa confirmed in the target roles. To save Hunter credits, an email is looked up automatically only for the
+  // best-matching person when Hunter found nobody reachable; everyone else gets a "Find email" button.
+  const reachable = () => out.some((c) => c.name && isSendable(c.emailStatus));
+  const exaRanked = [...(args.exaPeople ?? [])].sort((a, b) => titleScore(b.jobTitle, roles) - titleScore(a.jobTitle, roles));
   const sameName = (a: string | null, b: string) => !!a && a.toLowerCase().replace(/[^a-z]/g, "") === b.toLowerCase().replace(/[^a-z]/g, "");
-  for (const p of args.exaPeople ?? []) {
+  for (const p of exaRanked) {
     const existing = out.find((c) => sameName(c.name, p.name));
     if (existing) {
       existing.linkedinUrl ??= p.linkedinUrl;
@@ -97,8 +100,9 @@ export async function findContacts(args: { domain: string; roles: string[]; evid
     let email: string | null = null;
     let status: ContactStatus = "not_found";
     let confidence: number | null = null;
-    if (hunterAvailable() && first && last) {
+    if (hunterAvailable() && first && last && !reachable()) {
       const f = await emailFinder(domain, first, last).catch(() => null);
+      confidence = 0; // looked up; overwritten below when an address is found
       if (f?.email) {
         email = f.email;
         confidence = f.score;
@@ -145,6 +149,7 @@ export async function findContacts(args: { domain: string; roles: string[]; evid
         let confidence: number | null = null;
         if (hunterAvailable() && first && last) {
           const f = await emailFinder(domain, first, last).catch(() => null);
+          confidence = 0;
           if (f?.email) {
             email = f.email;
             confidence = f.score;
@@ -160,11 +165,18 @@ export async function findContacts(args: { domain: string; roles: string[]; evid
 
   const rank = (c: ContactDraft) => (isSendable(c.emailStatus) ? 10 : c.emailStatus === "published_generic" ? 1 : c.name ? 2 : 0) + (c.emailStatus === "verified" ? 2 : 0) + c.score * 5 + (c.name ? 1 : 0);
   out.sort((a, b) => rank(b) - rank(a));
-  const top = out.slice(0, 3);
+  const top = out.slice(0, Math.max(1, args.limit ?? 10));
   if (!top.length) {
     const contactPage = evidence.find((r) => r.kind === "contact");
     top.push({ name: null, firstName: null, lastName: null, title: roles[0] ?? null, email: null, emailStatus: "not_found", confidence: null, source: "none", sourceUrl: contactPage?.url ?? args.website, linkedinUrl: null, score: 0 });
   }
   void pattern;
   return top;
+}
+
+/** Status for an address Hunter's email finder returned. */
+export function finderStatus(f: { score: number | null; accept_all?: boolean; verification?: { status: string | null } }, domainAcceptAll = false): ContactStatus {
+  if (f.verification?.status === "valid") return "verified";
+  if (domainAcceptAll || f.accept_all) return "accept_all";
+  return (f.score ?? 0) >= 90 ? "verified" : "unknown";
 }

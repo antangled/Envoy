@@ -1,6 +1,6 @@
 "use client";
 import { useLayoutEffect, useRef } from "react";
-import { AI_BLOCKS, VARIABLES, tokenize } from "@/lib/template/render";
+import { AI_BLOCKS, MY_FIELDS, VARIABLES, tokenize } from "@/lib/template/render";
 
 /**
  * A plain textarea with a highlight layer behind it: the user edits the whole email as one piece of text,
@@ -36,11 +36,18 @@ export function TemplateEditor({ id, value, onChange, minRows = 12, label }: { i
     <div>
       <div className="flex flex-wrap items-center gap-1.5 rounded-t-lg border border-b-0 border-rule bg-sunken px-2 py-1.5" role="toolbar" aria-label="Insert into email">
         <span className="px-1 text-[12px] text-ink-3">Insert</span>
+        {MY_FIELDS.map((v) => (
+          <button key={v.token} type="button" title={v.help} onClick={() => insert(v.token, false)} className="rounded-md bg-warn-bg px-2 py-0.5 text-[12px] font-semibold text-warn hover:brightness-95">
+            {v.label}
+          </button>
+        ))}
+        <span className="mx-0.5 h-4 w-px bg-rule" aria-hidden />
         {VARIABLES.map((v) => (
           <button key={v.token} type="button" title={v.help} onClick={() => insert(v.token, false)} className="rounded-md bg-ok-bg px-2 py-0.5 text-[12px] font-semibold text-ok hover:brightness-95">
             {v.label}
           </button>
         ))}
+        <span className="mx-0.5 h-4 w-px bg-rule" aria-hidden />
         {AI_BLOCKS.map((v) => (
           <button key={v.token} type="button" title={v.help} onClick={() => insert(v.token, v.token === "{{ai_ideas}}")} className="rounded-md bg-carbon px-2 py-0.5 text-[12px] font-semibold text-link hover:brightness-95">
             ✦ {v.label}
@@ -71,10 +78,11 @@ function Highlighted({ text }: { text: string }) {
     <>
       {tokenize(text).map((p, i) => {
         if (p.kind === "text") return <span key={i}>{p.text}</span>;
-        if (p.kind === "fill") return <mark key={i} className="rounded-sm bg-warn-bg text-warn">[{p.text}]</mark>;
+        if (p.kind === "fill") return <mark key={i} className="rounded-sm bg-bad-bg text-bad">[{p.text}]</mark>;
+        if (p.kind === "mine") return <mark key={i} className="rounded-sm bg-warn-bg text-warn">{p.raw}</mark>;
         if (p.kind === "var") return <mark key={i} className="rounded-sm bg-ok-bg text-ok">{p.raw}</mark>;
         if (p.kind === "ai") return <mark key={i} className="rounded-sm bg-carbon text-link">{p.raw}</mark>;
-        return <mark key={i} className="rounded-sm bg-bad-bg text-bad">{p.raw}</mark>;
+        return <mark key={i} className="rounded-sm bg-bad-bg text-bad underline decoration-wavy">{p.raw}</mark>;
       })}
       {/* keeps the layer as tall as the textarea when the text ends in a newline */}
       {"\n "}

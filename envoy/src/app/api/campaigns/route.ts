@@ -32,6 +32,7 @@ const In = z.object({
   mode: z.enum(["client", "partnership"]),
   goalText: z.string().min(10, "Describe the goal in a sentence or two.").max(2000),
   contactCount: z.number().int().min(1).max(50),
+  peoplePerCompany: z.number().int().min(1).max(20).default(10),
   attachDeck: z.boolean(),
   advanced: z.object({ geography: z.string().max(200).optional(), sizeHint: z.string().max(200).optional(), extraCriteria: z.string().max(500).optional() }).default({}),
 });
@@ -46,7 +47,7 @@ export const POST = handle(async (req: Request) => {
   const unfilled = unfilledPlaceholders(email);
   if (unfilled.length) throw new HttpError(400, `Your ${body.mode === "partnership" ? "partnership" : "client"} email still has ${unfilled.length} placeholder${unfilled.length === 1 ? "" : "s"} to replace in Setup, starting with [${unfilled[0]}].`);
   const unknown = unknownTokens(email);
-  if (unknown.length) throw new HttpError(400, `Your email uses ${unknown[0]}, which Envoy doesn't recognize. Use {{first_name}}, {{company}}, {{ai_opening}}, or {{ai_ideas}}.`);
+  if (unknown.length) throw new HttpError(400, `Your email uses ${unknown[0]}, which Envoy doesn't recognize. Use the Insert buttons in Setup to add a supported field.`);
   const goal = [body.goalText, body.advanced.geography && `Geography: ${body.advanced.geography}.`, body.advanced.sizeHint && `Company size: ${body.advanced.sizeHint}.`, body.advanced.extraCriteria && `Also must: ${body.advanced.extraCriteria}.`]
     .filter(Boolean)
     .join(" ");
@@ -54,7 +55,7 @@ export const POST = handle(async (req: Request) => {
   const db = await getDb();
   const [c] = await db
     .insert(schema.campaigns)
-    .values({ userId: u.id, mode: body.mode, goalText: body.goalText, contactCount: body.contactCount, attachDeck: body.attachDeck, advanced: body.advanced, searchSpec: spec, rolesSelected: spec.roles.filter((r) => r.checked).map((r) => r.title), status: "spec", specSource: source })
+    .values({ userId: u.id, mode: body.mode, goalText: body.goalText, contactCount: body.contactCount, peoplePerCompany: body.peoplePerCompany, attachDeck: body.attachDeck, advanced: body.advanced, searchSpec: spec, rolesSelected: spec.roles.filter((r) => r.checked).map((r) => r.title), status: "spec", specSource: source })
     .returning();
   return Response.json({ id: c.id });
 });

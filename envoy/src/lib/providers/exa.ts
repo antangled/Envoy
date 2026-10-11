@@ -2,6 +2,7 @@ import "server-only";
 import Exa from "exa-js";
 import { normalizeDomain } from "./fetchPage";
 import { secret } from "@/lib/env";
+import { recordExa } from "@/lib/usage";
 
 /**
  * Exa usage follows the build-with-exa skill:
@@ -32,6 +33,7 @@ function citationFor(grounding: { field: string; citations: { url: string }[] }[
 async function runAgent<T>(params: Parameters<ReturnType<typeof exa>["agent"]["runs"]["create"]>[0] & { effort: "low" }) {
   try {
     const run = await exa().agent.runs.createAndWait(params, WAIT);
+    recordExa(run.costDollars?.total as number | undefined);
     return { structured: run.output?.structured as T | undefined, grounding: run.output?.grounding ?? null, cost: run.costDollars };
   } catch (e) {
     const run = (e as { run?: { status?: string; error?: { message?: string } } }).run;
@@ -94,10 +96,10 @@ export interface ExaPerson {
 }
 
 /** One Agent run enriches every selected organization with the people in the target roles. */
-export async function findPeople(orgs: { name: string; domain: string }[], roles: string[]): Promise<ExaPerson[]> {
+export async function findPeople(orgs: { name: string; domain: string }[], roles: string[], perCompany = 10): Promise<ExaPerson[]> {
   if (!orgs.length) return [];
   const r = await runAgent<{ people: { domain: string; name: string; job_title: string; linkedin_url?: string; source_url?: string }[] }>({
-    query: `For each organization in the input, find up to 2 people who currently hold one of these roles, or the closest senior equivalent: ${roles.join(", ")}.`,
+    query: `For each organization in the input, find up to ${perCompany} people who currently hold one of these roles, or the closest senior equivalent: ${roles.join(", ")}. Several people in the same role are welcome.`,
     systemPrompt:
       "Include a person only when a source confirms they currently hold that role at that organization. Never guess or infer a name. Leave an organization out if no one can be confirmed. domain must be the organization's domain from the input. source_url is the page that confirms the role.",
     effort: "low",
@@ -107,7 +109,7 @@ export async function findPeople(orgs: { name: string; domain: string }[], roles
       properties: {
         people: {
           type: "array",
-          maxItems: orgs.length * 2,
+          maxItems: orgs.length * perCompany,
           items: {
             type: "object",
             properties: {
@@ -136,6 +138,7 @@ export async function findPeople(orgs: { name: string; domain: string }[], roles
 /** Known URLs → page text. The 4,000-character cap is the per-page evidence budget for the brief. */
 export async function contents(urls: string[]) {
   const res = await exa().getContents(urls, { text: { maxCharacters: 4000 } });
+  recordExa((res as { costDollars?: { total?: number } }).costDollars?.total);
   return res.results.filter((r) => r.text && r.text.length > 200).map((r) => ({ url: r.url, title: r.title || r.url, text: r.text }));
 }
 
@@ -146,6 +149,7 @@ export async function recentNews(companyName: string, domain: string) {
     numResults: 5,
     contents: { highlights: true },
   });
+  recordExa((res as { costDollars?: { total?: number } }).costDollars?.total);
   const key = companyName.toLowerCase().split(/\s+/)[0];
   return res.results
     .map((r) => ({ url: r.url, title: r.title || r.url, text: (r.highlights ?? []).join("\n"), publishedDate: r.publishedDate }))

@@ -6,7 +6,7 @@ import { Badge, Button, Label, Notice } from "@/components/ui";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { EmailView } from "@/components/EmailView";
 import { api, fileToBase64 } from "@/lib/client/api";
-import { renderBody, renderSubject, unfilledPlaceholders, unknownTokens, usesAi, type Mode, type Signature } from "@/lib/template/render";
+import { meFrom, renderBody, renderSubject, unfilledPlaceholders, unknownTokens, usesAi, type Mode, type Signature } from "@/lib/template/render";
 
 interface Profile {
   orgName: string; tagline: string; website: string; serviceCatalog: string[];
@@ -16,34 +16,33 @@ interface Profile {
 }
 
 const FREE_MAIL = /@(gmail|googlemail|yahoo|outlook|hotmail|live|msn|icloud|me|aol|proton|protonmail|gmx|zoho)\./i;
-const SAMPLE = { company: "Northwind Robotics", firstName: "Jordan" };
+const SAMPLE = { company: "Example Co.", firstName: "Jordan" };
 
-/** Filled from the founder's real outreach email (BEACN → Lightship, Sept 2026). Postal address stays with the user. */
+/** Filled from the founder's real outreach email (BEACN → Lightship, Sept 2026). */
 const BEACN: Partial<Profile> = {
   orgName: "BEACN",
   tagline: "Student-run consulting for environmentally and socially responsible organizations.",
-  website: "",
   serviceCatalog: ["market sizing", "competitive landscaping", "regulatory research", "supply-chain analysis", "data collection"],
   meName: "Adam Tang",
   mePronouns: "he/him/his",
   meRole: "Project Manager",
-  subjectTemplate: "BEACN x {{company}} collaboration?",
+  subjectTemplate: "{{my_company}} x {{company}} collaboration?",
   templateClient: `Dear {{first_name}},
 
-Hope you're doing well! I'm Adam, a Project Manager at BEACN, a student-run sustainability consulting group at UC Berkeley. I saw {{ai_opening}}, and wanted to reach out about potentially supporting that through a semester-long project.
+Hope you're doing well! I'm {{my_first_name}}, a {{my_title}} at {{my_company}}, a student-run sustainability consulting group at UC Berkeley. I saw {{ai_opening}}, and wanted to reach out about potentially supporting that through a semester-long project.
 
 A few ideas that came to mind:
 
 {{ai_ideas}}
 
-To provide some context, BEACN projects are staffed by seven Berkeley students plus an MBA mentor from Haas. Across 180+ projects for 150+ organizations, we've worked on market sizing, competitive landscaping, regulatory research, supply-chain analysis, and data collection. (More info in deck attached)
+To provide some context, {{my_company}} projects are staffed by seven Berkeley students plus an MBA mentor from Haas. Across 180+ projects for 150+ organizations, we've worked on market sizing, competitive landscaping, regulatory research, supply-chain analysis, and data collection. (More info in deck attached)
 
 We're finalizing our fall projects this week, and I'd love to hear what would actually be most useful to {{company}}.
 
 Would this be of interest to you? If so, I'm happy to arrange a time as early as tomorrow; happy to work around your calendar.`,
 };
 
-/** Shrinks a logo to at most 360px wide so it stays small inside every email. */
+/** Shrinks a logo to at most 360×120 so it stays small inside every email. */
 async function logoDataUri(file: File): Promise<string> {
   const url = URL.createObjectURL(file);
   try {
@@ -68,7 +67,7 @@ export default function SetupPage() {
   const { status, refresh } = useStatus();
   const router = useRouter();
   const [p, setP] = useState<Profile | null>(null);
-  const [saved, setSaved] = useState<string>("");
+  const [saved, setSaved] = useState("");
   const [email, setEmail] = useState("");
   const [mode, setMode] = useState<Mode>("client");
   const [deck, setDeck] = useState<{ name: string; base64: string } | null>(null);
@@ -91,8 +90,7 @@ export default function SetupPage() {
     api<{ profile: Profile; exclusions: { value: string; source: string }[]; dailyCap: number; email: string }>("/api/setup")
       .then((d) => {
         const guess = d.profile.website || (FREE_MAIL.test(d.email) || d.email.endsWith(".local") ? "" : d.email.split("@")[1]);
-        const prof = { ...d.profile, website: guess };
-        setP(prof);
+        setP({ ...d.profile, website: guess });
         setSaved(JSON.stringify(d.profile));
         setExclusions(d.exclusions);
         setCap(d.dailyCap);
@@ -128,33 +126,24 @@ export default function SetupPage() {
   const unfilled = unfilledPlaceholders(`${p.subjectTemplate}\n${body}`);
   const unknown = unknownTokens(`${p.subjectTemplate}\n${body}`);
   const ai = usesAi(body);
-  const dirty = saved !== JSON.stringify({ ...p, website: p.website }) || !!deck || removeDeck || !!exclText;
+  const dirty = saved !== JSON.stringify(p) || !!deck || removeDeck || !!exclText;
+  const detailsDone = !!(p.meName && p.meRole && p.orgName);
   const emailDone = !unfilledPlaceholders(`${p.subjectTemplate}\n${p.templateClient}`).length && !unknown.length;
-  const sigDone = !!(p.meName && p.orgName && p.postalAddress);
   const gmail = !!status?.user?.gmailConnected;
+  const ctx = { ...SAMPLE, me: meFrom(sig), slots: null };
 
   async function fill() {
     if (!p) return;
     setFilling(true);
     setMsg(null);
     try {
-      const r = await api<{ subject: string; client: string; partnership: string; orgName: string; tagline: string; services: string[]; ai: boolean }>("/api/setup/draft", {
+      const r = await api<{ subject: string; client: string; partnership: string; orgName: string; tagline: string; services: string[] }>("/api/setup/draft", {
         method: "POST",
         json: { website: p.website || null, deckB64: deck?.base64 ?? null, subject: p.subjectTemplate, client: p.templateClient, partnership: p.templatePartnership, me: { name: p.meName, role: p.meRole, org: p.orgName } },
       });
-      setP((x) =>
-        x && {
-          ...x,
-          subjectTemplate: r.subject,
-          templateClient: r.client,
-          templatePartnership: r.partnership,
-          orgName: x.orgName || r.orgName,
-          tagline: x.tagline || r.tagline,
-          serviceCatalog: x.serviceCatalog.length ? x.serviceCatalog : r.services,
-        },
-      );
+      setP((x) => x && { ...x, subjectTemplate: r.subject, templateClient: r.client, templatePartnership: r.partnership, orgName: x.orgName || r.orgName, tagline: x.tagline || r.tagline, serviceCatalog: x.serviceCatalog.length ? x.serviceCatalog : r.services });
       const left = unfilledPlaceholders(`${r.subject}\n${r.client}`).length;
-      setMsg({ tone: left ? "warn" : "ok", text: left ? `Filled in what your ${deck ? "deck" : "site"} covers. ${left} placeholder${left === 1 ? "" : "s"} left for you below.` : "Filled in. Read it over, then save." });
+      setMsg({ tone: left ? "warn" : "ok", text: left ? `Written from your ${deck ? "deck" : "site"}. ${left} red placeholder${left === 1 ? "" : "s"} left for you to fill in below.` : "Written from your site. Read it over, then save." });
     } catch (e) {
       setMsg({ tone: "bad", text: (e as Error).message });
     } finally {
@@ -196,40 +185,40 @@ export default function SetupPage() {
     }
   }
 
-  const ctx = { ...SAMPLE, slots: null };
-
   return (
     <>
       <div className="mb-8">
         <h1 className="font-serif text-[34px] font-medium leading-tight tracking-[-0.01em]">Your email</h1>
-        <p className="mt-2 max-w-[64ch] text-[15px] text-ink-2">Write it once. For every company, Envoy fills in the name and writes the highlighted parts from that company&rsquo;s own website and news.</p>
+        <p className="mt-2 max-w-[64ch] text-[15px] text-ink-2">Write it once. For every company, Envoy fills in who it&rsquo;s to and writes the blue parts from that company&rsquo;s own website and news.</p>
       </div>
 
       <ol className="mb-8 grid gap-3 sm:grid-cols-3" aria-label="Setup checklist">
-        <Check done={emailDone} n={1} title="Write your email" detail={emailDone ? "No placeholders left" : `${unfilledPlaceholders(`${p.subjectTemplate}\n${p.templateClient}`).length} placeholders to fill`} />
-        <Check done={sigDone} n={2} title="Add your signature" detail={sigDone ? `${p.meName}, ${p.orgName}` : "Name, organization, postal address"} />
+        <Check done={detailsDone} n={1} title="Your details" detail={detailsDone ? `${p.meName}, ${p.meRole}, ${p.orgName}` : "Name, title, organization"} />
+        <Check done={emailDone} n={2} title="Your email" detail={emailDone ? "Ready to send" : `${unfilledPlaceholders(`${p.subjectTemplate}\n${p.templateClient}`).length} red placeholders to fill`} />
         <Check done={testSent} n={3} title="Send yourself a test" detail={gmail ? (testSent ? "Sent" : `To ${email}`) : "Sign in with Google first"} action={gmail && !testSent ? <button type="button" className="text-link hover:underline" onClick={sendTest}>Send test</button> : null} />
       </ol>
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)]">
         <div className="min-w-0 space-y-10">
-          <section aria-labelledby="fill-h" className="rounded-xl border border-rule bg-surface p-5">
-            <h2 id="fill-h" className="text-[16px] font-semibold">Fill it in from your website</h2>
-            <p className="mt-1 text-[14px] text-ink-2">Envoy reads your site, or your deck, and replaces the yellow placeholders. You can edit everything after.</p>
-            <div className="mt-4 flex flex-wrap items-end gap-3">
-              <div className="min-w-[220px] flex-1">
-                <Label htmlFor="website">Website</Label>
-                <input id="website" className="field" placeholder="yourorg.com" value={p.website} onChange={(e) => set("website", e.target.value)} />
-              </div>
-              <Button onClick={fill} busy={filling} disabled={!p.website && !deck}>{filling ? "Reading" : "Fill in my email"}</Button>
+          <section aria-labelledby="me-h" className="rounded-xl border border-rule bg-surface p-5" onFocus={() => showPreview("top")}>
+            <h2 id="me-h" className="text-[16px] font-semibold">Your details</h2>
+            <p className="mt-1 text-[14px] text-ink-2">These fill the <mark className="rounded-sm bg-warn-bg px-1 text-ink">yellow</mark> parts of your email and your signature.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <Field id="meName" label="Your name" value={p.meName} onChange={(v) => set("meName", v)} placeholder="Adam Tang" />
+              <Field id="meRole" label="Your title" value={p.meRole} onChange={(v) => set("meRole", v)} placeholder="Project Manager" />
+              <Field id="orgName" label="Your organization" value={p.orgName} onChange={(v) => set("orgName", v)} placeholder="BEACN" />
+              <Field id="website" label="Organization website" value={p.website} onChange={(v) => set("website", v)} placeholder="yourorg.com" />
             </div>
-            <p className="mt-3 text-[13px] text-ink-3">
-              No website? Upload your deck below and click Fill in. Or{" "}
-              <button type="button" className="text-link hover:underline" onClick={() => { setP((x) => x && { ...x, ...BEACN, website: x.website }); setMsg({ tone: "warn", text: "Loaded the BEACN example. Add a postal address, then save." }); }}>
-                start from the BEACN example
-              </button>
-              .
-            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-rule pt-4">
+              <Button onClick={fill} busy={filling} disabled={!p.website && !deck}>{filling ? "Reading your site" : "Write the rest from my website"}</Button>
+              <span className="text-[13px] text-ink-3">
+                Fills the red placeholders from your site or deck. Or{" "}
+                <button type="button" className="text-link hover:underline" onClick={() => { setP((x) => x && { ...x, ...BEACN, website: x.website }); setMsg({ tone: "ok", text: "Loaded the BEACN example. Save to keep it." }); }}>
+                  start from the BEACN example
+                </button>
+                .
+              </span>
+            </div>
             {msg && <div className="mt-4"><Notice tone={msg.tone}>{msg.text}</Notice></div>}
           </section>
 
@@ -250,12 +239,11 @@ export default function SetupPage() {
                 <input id="subject" className="field" value={p.subjectTemplate} onChange={(e) => set("subjectTemplate", e.target.value)} />
               </div>
               <TemplateEditor id="body" label="Email body" value={body} onChange={(v) => set(templateKey, v)} />
-              <Legend />
-              {unfilled.length > 0 && <p className="text-[13px] text-warn">Replace the {unfilled.length} yellow placeholder{unfilled.length === 1 ? "" : "s"} before starting a campaign.</p>}
+              <Guide />
+              {unfilled.length > 0 && <p className="text-[13px] text-bad">Replace the {unfilled.length} red placeholder{unfilled.length === 1 ? "" : "s"} with your own words before starting a campaign.</p>}
               {unknown.length > 0 && <p className="text-[13px] text-bad">Envoy doesn&rsquo;t recognize {unknown.join(", ")}. Use the Insert buttons above.</p>}
-              {!ai.opening && !ai.ideas && <p className="text-[13px] text-warn">This email has no tailored parts, so every company gets the same text. Insert a tailored opening or ideas to personalize it.</p>}
+              {!ai.opening && !ai.ideas && <p className="text-[13px] text-warn">This email has no blue parts, so every company gets the same text. Insert a tailored opening or ideas to personalize it.</p>}
             </div>
-
             <div className="mt-6">
               <Label htmlFor="services" hint="Each tailored idea is built on one of these. One per line.">What you offer</Label>
               <textarea id="services" rows={3} className="field resize-y" value={p.serviceCatalog.join("\n")} onChange={(e) => set("serviceCatalog", e.target.value.split("\n"))} placeholder={"market sizing\ncompetitive landscaping\nregulatory research"} />
@@ -263,37 +251,33 @@ export default function SetupPage() {
           </section>
 
           <section aria-labelledby="sig-h" onFocus={() => showPreview("bottom")}>
-            <h2 id="sig-h" className="font-serif text-[22px] font-medium">Signature and footer</h2>
-            <p className="mb-4 mt-1 text-[14px] text-ink-2">Added under every email. The preview updates as you type.</p>
+            <h2 id="sig-h" className="font-serif text-[22px] font-medium">Signature</h2>
+            <p className="mb-4 mt-1 text-[14px] text-ink-2">Your name, title, and organization come from Your details; your organization links to its website. The preview updates as you type.</p>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field id="meName" label="Your name" value={p.meName} onChange={(v) => set("meName", v)} />
-              <Field id="meRole" label="Title" value={p.meRole} onChange={(v) => set("meRole", v)} placeholder="Project Manager" />
-              <Field id="orgName" label="Organization" value={p.orgName} onChange={(v) => set("orgName", v)} />
-              <Field id="mePronouns" label="Pronouns" hint="Optional" value={p.mePronouns} onChange={(v) => set("mePronouns", v)} />
-              <div className="sm:col-span-2"><Field id="tagline" label="Tagline" hint="Optional, one line under your organization" value={p.tagline} onChange={(v) => set("tagline", v)} /></div>
-              <Field id="phone" label="Phone" hint="Optional" value={p.phone} onChange={(v) => set("phone", v)} />
               <Field id="signoff" label="Sign-off" value={p.signoff} onChange={(v) => set("signoff", v)} placeholder="Best," />
+              <Field id="mePronouns" label="Pronouns" value={p.mePronouns} onChange={(v) => set("mePronouns", v)} placeholder="Optional, e.g. she/her" />
+              <div className="sm:col-span-2"><Field id="tagline" label="Tagline" value={p.tagline} onChange={(v) => set("tagline", v)} placeholder="Optional, one line under your organization" /></div>
+              <Field id="phone" label="Phone" value={p.phone} onChange={(v) => set("phone", v)} placeholder="Optional" />
+              <Field id="postal" label="Mailing address" value={p.postalAddress} onChange={(v) => set("postalAddress", v)} placeholder="Optional" />
               <div className="sm:col-span-2">
-                <Label htmlFor="logo" hint="Optional. PNG or JPG; shown under your signature.">Logo</Label>
+                <Label htmlFor="logo">Logo</Label>
                 <div className="flex flex-wrap items-center gap-3">
                   {/* eslint-disable-next-line @next/next/no-img-element -- uploaded logo is a data: URI; next/image has nothing to optimize */}
                   {p.logo && <img src={p.logo} alt="Your logo" className="max-h-10 max-w-[140px] rounded border border-rule bg-white p-1" />}
-                  <input id="logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="text-[13px] file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-ink"
+                  <input id="logo" type="file" accept="image/png,image/jpeg,image/gif,image/webp" className="max-w-full text-[13px] file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-ink"
                     onChange={async (e) => { const f = e.target.files?.[0]; if (f) set("logo", await logoDataUri(f)); }} />
                   {p.logo && <button type="button" className="text-[13px] text-link hover:underline" onClick={() => set("logo", null)}>Remove</button>}
                 </div>
               </div>
-              <div className="sm:col-span-2">
-                <Field id="postal" label="Postal address" hint="Required by US and Canadian email law. It appears in the small footer, with a one-line opt-out that Envoy always includes." value={p.postalAddress} onChange={(v) => set("postalAddress", v)} />
-              </div>
             </div>
+            <p className="mt-3 text-[13px] text-ink-3">Every email ends with one short line saying how you found the person and how to opt out.</p>
           </section>
 
-          <details className="group rounded-xl border border-rule bg-surface px-5 py-4">
+          <details className="rounded-xl border border-rule bg-surface px-5 py-4">
             <summary className="cursor-pointer text-[15px] font-semibold">Deck attachment <span className="font-normal text-ink-3">· {p.deckName && !removeDeck ? p.deckName : deck ? deck.name : "none"}</span></summary>
-            <p className="mt-2 text-[14px] text-ink-2">Attached to each email when a campaign is set to attach it. Envoy can also read it to fill in your email.</p>
+            <p className="mt-2 text-[14px] text-ink-2">Attached to each email when a campaign is set to attach it. Envoy can also read it to write your email.</p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <input id="deck" type="file" accept="application/pdf" className="text-[13px] file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-ink"
+              <input id="deck" type="file" accept="application/pdf" className="max-w-full text-[13px] file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-ink"
                 onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setDeck({ name: f.name, base64: await fileToBase64(f) }); setRemoveDeck(false); } }} />
               {p.deckName && !removeDeck && <button type="button" className="text-[13px] text-link hover:underline" onClick={() => setRemoveDeck(true)}>Remove {p.deckName}</button>}
             </div>
@@ -321,14 +305,15 @@ export default function SetupPage() {
               <Svc name="Company search" on={!!status?.integrations.exa} detail="Exa finds companies and the right people." />
               <Svc name="Email finding" on={!!status?.integrations.hunter} detail="Hunter finds and checks email addresses." />
             </ul>
-            <p className="mt-3 text-[12px] text-ink-3">Anything marked Demo uses a stand-in. Keys are set by whoever runs Envoy, in envoy/.env.local.</p>
           </details>
         </div>
 
         <aside className="lg:sticky lg:top-6 lg:self-start">
-          <div className="mb-2 flex items-baseline justify-between">
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-[13px] font-semibold text-ink-2">Preview</h2>
-            <span className="text-[12px] text-ink-3">for a sample company</span>
+            <span className="text-[12px] text-ink-3">
+              Sent to an example: <span className="rounded-sm bg-ok-bg px-1 text-ok">{SAMPLE.firstName}</span> at <span className="rounded-sm bg-ok-bg px-1 text-ok">{SAMPLE.company}</span>
+            </span>
           </div>
           <div ref={previewRef} className="max-h-[calc(100dvh-9rem)] overflow-auto rounded-xl border border-rule bg-surface p-5 shadow-[0_1px_0_var(--rule)]">
             <EmailView
@@ -354,7 +339,7 @@ export default function SetupPage() {
 
 function Check({ done, n, title, detail, action }: { done: boolean; n: number; title: string; detail: string; action?: React.ReactNode }) {
   return (
-    <li className={`flex items-start gap-3 rounded-xl border px-4 py-3 ${done ? "border-ok-bg bg-ok-bg/50" : "border-rule bg-surface"}`}>
+    <li className={`flex min-w-0 items-start gap-3 rounded-xl border px-4 py-3 ${done ? "border-ok-bg bg-ok-bg/50" : "border-rule bg-surface"}`}>
       <span className={`mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] font-semibold ${done ? "bg-ok text-paper" : "border border-rule text-ink-2"}`} aria-hidden>
         {done ? "✓" : n}
       </span>
@@ -367,20 +352,32 @@ function Check({ done, n, title, detail, action }: { done: boolean; n: number; t
   );
 }
 
-function Legend() {
+/** Plain-language key to the colors, with what each field turns into. */
+function Guide() {
+  const row = (cls: string, token: string, becomes: string) => (
+    <li className="grid grid-cols-[minmax(0,9.5rem)_minmax(0,1fr)] gap-3">
+      <code className={`justify-self-start rounded-sm px-1 text-[12px] ${cls}`}>{token}</code>
+      <span>{becomes}</span>
+    </li>
+  );
   return (
-    <p className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-3">
-      <span><mark className="rounded-sm bg-ok-bg px-1 text-ok">green</mark> filled in per contact</span>
-      <span><mark className="rounded-sm bg-carbon px-1 text-link">blue</mark> written per company</span>
-      <span><mark className="rounded-sm bg-warn-bg px-1 text-warn">yellow</mark> needs your words</span>
-    </p>
+    <details className="rounded-lg border border-rule bg-surface px-4 py-2.5 text-[13px] text-ink-2" open>
+      <summary className="cursor-pointer font-semibold text-ink">What the colors mean</summary>
+      <ul className="mt-2 space-y-1.5">
+        {row("bg-warn-bg text-warn", "{{my_first_name}}", "Yellow: your details, already filled in from the top of this page. Also {{my_title}} and {{my_company}}.")}
+        {row("bg-ok-bg text-ok", "{{first_name}}", "Green: changes for each person you email. Also {{company}}. Falls back to “{company} team” if no name is found.")}
+        {row("bg-carbon text-link", "{{ai_opening}}", "Blue: Envoy writes this for each company from its website and news, with sources. {{ai_ideas}} adds three tailored ideas.")}
+        {row("bg-bad-bg text-bad", "[like this]", "Red: type your own words here. Campaigns can’t start until none are left.")}
+      </ul>
+      <p className="mt-2">Type anywhere to change the wording. Use the Insert buttons to add a field where your cursor is.</p>
+    </details>
   );
 }
 
-function Field({ id, label, hint, value, onChange, placeholder }: { id: string; label: string; hint?: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
+function Field({ id, label, value, onChange, placeholder }: { id: string; label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div>
-      <Label htmlFor={id} hint={hint}>{label}</Label>
+      <Label htmlFor={id}>{label}</Label>
       <input id={id} className="field" value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
     </div>
   );

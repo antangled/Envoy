@@ -6,6 +6,7 @@ import { ownedCampaign } from "@/lib/pipeline/campaign";
 import { getOrg } from "@/lib/pipeline/org";
 import { researchProspect, updateShortfall, type Progress } from "@/lib/pipeline/research";
 import { exaAvailable, findPeople } from "@/lib/providers/exa";
+import { withUsage } from "@/lib/usage";
 
 export const maxDuration = 300;
 
@@ -30,12 +31,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
   const enc = new TextEncoder();
   const stream = new ReadableStream({
-    async start(controller) {
+    start: (controller) => withUsage(c.id, async () => {
       const emit = (e: Progress | Record<string, unknown>) => controller.enqueue(enc.encode(JSON.stringify(e) + "\n"));
       emit({ stage: "start", total: targets.length });
       // One Exa Agent run finds people at every company while pages are being read; a failure just means no Exa names.
       const people = exaAvailable()
-        ? findPeople(targets.map((p) => ({ name: p.name, domain: p.domain })), c.rolesSelected).catch((e) => {
+        ? findPeople(targets.map((p) => ({ name: p.name, domain: p.domain })), c.rolesSelected, c.peoplePerCompany).catch((e) => {
             console.error("exa people run failed", e);
             return [];
           })
@@ -57,8 +58,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       );
       const shortfall = await updateShortfall(c.id);
       emit({ stage: "complete", shortfall });
-      controller.close();
-    },
+    }).finally(() => controller.close()),
   });
   return new Response(stream, { headers: { "content-type": "application/x-ndjson", "cache-control": "no-store" } });
 }

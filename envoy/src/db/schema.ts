@@ -54,6 +54,8 @@ export const campaigns = pgTable("campaigns", {
   status: text("status").notNull().default("draft"),
   shortfall: jsonb("shortfall").$type<string[]>().notNull().default([]),
   specSource: text("spec_source").notNull().default("ai"),
+  peoplePerCompany: integer("people_per_company").notNull().default(10),
+  usage: jsonb("usage").$type<import("@/lib/usage").Usage>().notNull().default({ claudeUsd: 0, exaUsd: 0, hunterLookups: 0, sonnetBriefs: 0 }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -116,6 +118,8 @@ export const contacts = pgTable("contacts", {
   sourceUrl: text("source_url"),
   linkedinUrl: text("linkedin_url"),
   isPrimary: boolean("is_primary").notNull().default(false),
+  /** Chosen as a recipient of this company's email. Several people at one company can be selected. */
+  selected: boolean("selected").notNull().default(false),
 });
 export type ContactStatus = "verified" | "accept_all" | "unknown" | "published_generic" | "not_found";
 
@@ -140,6 +144,8 @@ export const sends = pgTable("sends", {
   toName: text("to_name"),
   orgName: text("org_name").notNull(),
   subject: text("subject").notNull(),
+  /** The body as personalized for this recipient; falls back to the draft's body. */
+  body: text("body"),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   gmailMessageId: text("gmail_message_id"),

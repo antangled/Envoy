@@ -73,8 +73,10 @@ function agentResult(body) {
     return { structured: { organizations: orgs }, grounding: orgs.map((o, i) => ({ field: `organizations[${i}].reason`, citations: [{ url: o.website }] })) };
   }
   if (props.people) {
-    const names = { "lightshiprv.com": ["Jordan Lee", "VP Operations"], "antora.com": ["Sam Rivera", "Head of Strategy"], "silanano.com": ["Riley Chen", "Head of Strategy"] };
-    const people = (body.input?.data ?? []).flatMap((row) => (names[row.domain] ? [{ domain: row.domain, name: names[row.domain][0], job_title: names[row.domain][1], linkedin_url: `https://www.linkedin.com/in/${names[row.domain][0].toLowerCase().replace(" ", "-")}-example`, source_url: `https://${row.domain}/team` }] : []));
+    const roster = [["Jordan Lee", "VP Operations"], ["Casey Morgan", "Head of Strategy"], ["Taylor Kim", "Director of Operations"], ["Morgan Diaz", "Chief of Staff"], ["Quinn Patel", "VP Business Development"]];
+    const people = (body.input?.data ?? []).flatMap((row) =>
+      roster.map(([name, job_title]) => ({ domain: row.domain, name, job_title, linkedin_url: `https://www.linkedin.com/in/${name.toLowerCase().replace(" ", "-")}-example`, source_url: `https://${row.domain}/team` })),
+    );
     return { structured: { people }, grounding: [] };
   }
   return { structured: {}, grounding: [] };
@@ -89,7 +91,10 @@ function hunter(path, q) {
     if (domain === "antora.com") return { data: { pattern: "{first}", accept_all: true, organization: "Antora", emails: [{ value: "sam.rivera@example.org", confidence: 80, first_name: "Sam", last_name: "Rivera", position: "Head of Strategy", seniority: "senior", department: "management", linkedin: "sam-rivera", sources: [], verification: { status: "accept_all" } }] } };
     return { data: { pattern: "{first}.{last}", accept_all: false, organization: null, emails: [] } };
   }
-  if (path === "/v2/email-finder") return { data: { email: `${q.get("first_name")}.${q.get("last_name")}@example.net`.toLowerCase(), score: 92, verification: { status: null } } };
+  if (path === "/v2/email-finder") {
+    if (q.get("first_name") === "Morgan") return { data: { email: null, score: null } };
+    return { data: { email: `${q.get("first_name")}.${q.get("last_name")}@example.net`.toLowerCase(), score: 92, verification: { status: null } } };
+  }
   return { data: null };
 }
 
@@ -114,7 +119,7 @@ http.createServer(async (req, res) => {
     const run = runs.get(id);
     if (!run) return send(res, 404, { error: "unknown run" });
     run.polls++;
-    if (run.polls < 2) return send(res, 200, { id, status: "running" });
+    if (run.polls < (run.body.outputSchema?.properties?.organizations ? 3 : 2)) return send(res, 200, { id, status: "running" });
     return send(res, 200, { id, status: "completed", stopReason: "schema_satisfied", output: { text: "", ...agentResult(run.body) }, costDollars: { total: 0.05 } });
   }
   if (req.method === "POST" && url.pathname === "/contents") { const b = await readBody(req); log.push({ api: "exa", path: "/contents", n: b.urls?.length }); return send(res, 200, { results: [] }); }

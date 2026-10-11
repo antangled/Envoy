@@ -5,7 +5,8 @@ import { decrypt } from "@/lib/crypto";
 import { accessTokenFromRefresh, buildMime, logoPart, sendGmail } from "@/lib/providers/gmail";
 import { emailHtml, footerText } from "@/lib/template/render";
 import { isSendable } from "./contacts";
-import { getOrg } from "./org";
+import { getOrg, signatureFor } from "./org";
+import { renderDraft } from "./draft";
 
 type User = typeof schema.users.$inferSelect;
 
@@ -37,7 +38,7 @@ const rand = (min: number, max: number) => min + Math.random() * (max - min);
 export async function queueCampaign(user: User, campaignId: number, tz: string) {
   const db = await getDb();
   const org = await getOrg(user.id);
-  if (!org?.postalAddress) throw new Error("Add your organization's postal address in Setup before sending. It goes in the required footer.");
+  if (!org) throw new Error("Finish Setup before sending.");
   const live = !!user.googleRefreshTokenEnc;
   const channel = live ? ("gmail" as const) : ("demo" as const);
   const ps = await db.select().from(schema.prospects).where(eq(schema.prospects.campaignId, campaignId));
@@ -54,18 +55,29 @@ export async function queueCampaign(user: User, campaignId: number, tz: string) 
   const times = existing.map((s) => s.scheduledAt.getTime());
   const skipped: string[] = [];
   const rows: (typeof schema.sends.$inferInsert)[] = [];
-  for (const d of drafts) {
+  const [campaign] = await db.select().from(schema.campaigns).where(eq(schema.campaigns.id, campaignId));
+  const briefs = await db.select().from(schema.briefs).where(inArray(schema.briefs.prospectId, pIds));
+  // Every selected person at a company gets their own copy, greeted by name.
+  const recipients = drafts.flatMap((d) => {
     const p = ps.find((x) => x.id === d.prospectId)!;
-    const c = contacts.find((x) => x.id === d.contactId);
-    if (already.some((s) => s.draftId === d.id)) continue;
+    const primary = contacts.find((x) => x.id === d.contactId) ?? null;
+    let chosen = contacts.filter((x) => x.prospectId === p.id && x.selected);
+    if (!chosen.length && primary) chosen = [primary];
+    if (!chosen.length) skipped.push(`${p.name}: no recipient chosen`);
+    return chosen.map((c) => ({ d, p, c, primary }));
+  });
+  for (const { d, p, c, primary } of recipients) {
+    if (already.some((s) => s.draftId === d.id && s.toEmail === c.email?.toLowerCase())) continue;
     if (!c?.email || !(isSendable(c.emailStatus) || (c.emailStatus === "published_generic" && d.allowGeneric))) {
-      skipped.push(`${p.name}: no sendable email`);
+      skipped.push(`${p.name}: ${c?.name ?? "contact"} has no sendable email`);
       continue;
     }
     const email = c.email.toLowerCase();
     const domain = email.split("@")[1];
     if (supp.has(email)) { skipped.push(`${p.name}: ${email} opted out`); continue; }
-    if (excl.has(email) || excl.has(domain)) { skipped.push(`${p.name}: already contacted`); continue; }
+    // A company domain is excluded after its first send. Colleagues ticked on this same draft are still allowed.
+    const sameDraft = already.some((s) => s.draftId === d.id) || rows.some((r) => r.draftId === d.id);
+    if (excl.has(email) || (excl.has(domain) && !sameDraft)) { skipped.push(`${p.name}: already contacted`); continue; }
     if (live) {
       cursor = new Date(cursor.getTime() + rand(60, 180) * 1000);
       for (;;) {
@@ -81,7 +93,18 @@ export async function queueCampaign(user: User, campaignId: number, tz: string) 
       cursor = new Date(cursor.getTime() + rand(3, 8) * 1000);
     }
     times.push(cursor.getTime());
-    rows.push({ draftId: d.id, campaignId, userId: user.id, toEmail: email, toName: c.name, orgName: p.name, subject: d.subject, scheduledAt: cursor, channel });
+    // Personalize the body for this recipient: re-render from the template, or swap the greeting name in a hand-edited draft.
+    const brief = briefs.find((b) => b.prospectId === p.id);
+    let body = d.body;
+    if (c.id !== primary?.id) {
+      if (!d.userEdited && brief) body = renderDraft(org, campaign, p.name, c, brief.data).body;
+      else {
+        const from = primary?.firstName || `${p.name} team`;
+        const to = c.firstName || `${p.name} team`;
+        body = body.replace(from, to);
+      }
+    }
+    rows.push({ draftId: d.id, campaignId, userId: user.id, toEmail: email, toName: c.name, orgName: p.name, subject: d.subject, body, scheduledAt: cursor, channel });
   }
   if (rows.length) await db.insert(schema.sends).values(rows);
   await db.update(schema.campaigns).set({ status: "sending" }).where(eq(schema.campaigns.id, campaignId));
@@ -109,7 +132,8 @@ export async function processDue(userId?: number) {
       await db.update(schema.sends).set({ status: "skipped", error: "Recipient opted out" }).where(eq(schema.sends.id, s.id));
       continue;
     }
-    const [draft] = await db.select().from(schema.drafts).where(eq(schema.drafts.id, s.draftId));
+    const [draft0] = await db.select().from(schema.drafts).where(eq(schema.drafts.id, s.draftId));
+    const draft = { ...draft0, body: s.body ?? draft0.body };
     const org = await getOrg(s.userId);
     const footer = footerText({ meName: org?.meName || "", orgName: org?.orgName || "", postalAddress: org?.postalAddress || "" }, s.orgName);
     const text = `${draft.body}\n\n${footer}`;
@@ -125,7 +149,7 @@ export async function processDue(userId?: number) {
           toName: s.toName,
           subject: draft.subject,
           text,
-          html: emailHtml(draft.body, footer, logo?.cid ?? null),
+          html: emailHtml(draft.body, footer, logo?.cid ?? null, signatureFor(org)),
           logo,
           attachment: camp?.attachDeck && org?.deckB64 ? { filename: org.deckName || "deck.pdf", base64: org.deckB64 } : null,
         });

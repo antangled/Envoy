@@ -10,7 +10,8 @@ export const CONTACT_LABEL: Record<ContactStatus, { label: string; tone: "ok" | 
   not_found: { label: "No contact", tone: "bad", help: "No named person or address was found." },
 };
 
-export function ContactBadge({ status, named }: { status: ContactStatus; named?: boolean }) {
+export function ContactBadge({ status, named, checked = true }: { status: ContactStatus; named?: boolean; checked?: boolean }) {
+  if (status === "not_found" && named && !checked) return <Badge tone="muted" title="Not looked up yet, to save lookup credits. Use Find email.">Email not checked</Badge>;
   if (status === "not_found" && named) return <Badge tone="warn" title="This person was found, but no email address for them was.">No email</Badge>;
   const c = CONTACT_LABEL[status];
   return <Badge tone={c.tone} title={c.help}>{c.label}</Badge>;

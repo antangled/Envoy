@@ -1,6 +1,6 @@
 "use client";
 import type { Block, Signature } from "@/lib/template/render";
-import { footerText, signatureLines } from "@/lib/template/render";
+import { footerText } from "@/lib/template/render";
 
 /**
  * The whole email as the recipient will see it. While previewing a template, generated parts show as markers;
@@ -70,9 +70,15 @@ export function EmailView({
                         <Marker key={j}>a recent, sourced detail about {company}</Marker>
                       )
                     ) : s.kind === "fill" ? (
-                      <span key={j} className="rounded-sm bg-warn-bg px-[2px] text-warn" title="Replace this with your own words">[{s.text}]</span>
+                      <span key={j} className="rounded-sm bg-bad-bg px-[2px] text-bad" title="Replace this with your own words in the editor">[{s.text}]</span>
+                    ) : s.kind === "mine" ? (
+                      highlightVars ? (
+                        <span key={j} className={`rounded-sm px-[2px] ${s.empty ? "bg-bad-bg text-bad" : "bg-warn-bg text-ink"}`} title={s.empty ? `Add ${s.label.toLowerCase()} in Your details` : `${s.label}, from Your details`}>{s.empty ? `[${s.text}]` : s.text}</span>
+                      ) : (
+                        <span key={j}>{s.text}</span>
+                      )
                     ) : s.kind === "var" && highlightVars ? (
-                      <span key={j} className="underline decoration-carbon-line decoration-dotted underline-offset-4" title="Filled in for each contact">{s.text}</span>
+                      <span key={j} className="rounded-sm bg-ok-bg px-[2px] text-ok" title="Example only. Filled in with each real recipient">{s.text}</span>
                     ) : (
                       <span key={j}>{s.text}</span>
                     ),
@@ -94,20 +100,28 @@ export function EmailView({
       )}
       {showFooter && (
         <p className="mt-5 whitespace-pre-line border-t border-dashed border-rule pt-3 text-[12px] leading-relaxed text-ink-3">
-          {footerText({ meName: signature.name, orgName: signature.org, postalAddress: signature.postalAddress || "[your postal address]" }, company).replace(/^—\n/, "")}
+          {footerText({ meName: signature.name, orgName: signature.org, postalAddress: signature.postalAddress }, company).replace(/^—\n/, "")}
         </p>
       )}
     </div>
   );
 }
 
-export function SignatureBlock({ signature }: { signature: Signature }) {
-  const lines = signatureLines(signature);
+/** Mirrors the HTML signature that's sent: italic pronouns, linked organization, grey italic tagline. */
+export function SignatureBlock({ signature: s }: { signature: Signature }) {
+  const site = s.website ? (/^https?:\/\//.test(s.website) ? s.website : `https://${s.website}`) : "";
+  const contact = [s.website.replace(/^https?:\/\//, "").replace(/\/$/, ""), s.phone].filter(Boolean);
   return (
-    <div className="pt-1">
-      <p className="whitespace-pre-line">{lines.join("\n")}</p>
+    <div className="pt-1 leading-snug">
+      <p className="mb-1.5">{s.signoff}</p>
+      <p>{s.name || s.firstName || <span className="text-ink-3">Your name</span>}</p>
+      {s.pronouns && <p className="italic">({s.pronouns})</p>}
+      {s.title && <p>{s.title}</p>}
+      {s.org && <p>{site ? <a href={site} target="_blank" rel="noreferrer" className="text-link underline underline-offset-2">{s.org}</a> : s.org}</p>}
+      {s.tagline && <p className="italic text-ink-3">{s.tagline}</p>}
+      {contact.length > 0 && <p className="text-[15px] text-ink-2">{contact.join(" · ")}</p>}
       {/* eslint-disable-next-line @next/next/no-img-element -- uploaded logo is a data: URI; next/image has nothing to optimize */}
-      {signature.logo && <img src={signature.logo} alt="" className="mt-2 max-h-12 max-w-[180px]" />}
+      {s.logo && <img src={s.logo} alt="" className="mt-2 max-h-12 max-w-[180px]" />}
     </div>
   );
 }

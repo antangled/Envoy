@@ -2,6 +2,8 @@
 
 Everything you need to run Envoy on your laptop, test it, and change it. Read top to bottom once; after that, sections 3 and 6 are the ones you'll come back to.
 
+Recording the demo video? See [DEMO-VIDEO.md](DEMO-VIDEO.md) for the shot list, script and proof checklist.
+
 ---
 
 ## 1. What Envoy does, in one paragraph
