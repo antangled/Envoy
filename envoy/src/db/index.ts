@@ -20,6 +20,8 @@ async function init(): Promise<DB> {
     await migrate(db, { migrationsFolder });
     return db;
   }
+  // Vercel's filesystem is read-only and not shared between functions, so the embedded database can't work there.
+  if (process.env.VERCEL) throw new Error("DATABASE_URL is not set. On Vercel, add a Postgres database to the project (Storage, then Neon) and redeploy.");
   const { PGlite } = await import("@electric-sql/pglite");
   const { drizzle } = await import("drizzle-orm/pglite");
   const { migrate } = await import("drizzle-orm/pglite/migrator");
