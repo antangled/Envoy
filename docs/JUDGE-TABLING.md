@@ -2,7 +2,7 @@
 
 Sunday, Oct 11, preliminary rounds 1:30 to 2:30. About 5 minutes per judge. This is what to set up, what to say, and, most importantly, what to hand the judge to do themselves.
 
-**The one idea to land:** outreach that takes an evening per company now takes a minute, and every sentence Envoy writes has a source the judge can click.
+**The one idea to land:** outreach that took more than an hour per company takes minutes, and every claim Envoy makes about a company links to the page it came from, which the judge can click.
 
 **The engagement rule:** the judge drives. Every minute or so, hand them something to do: name a target, click a source, add a line, press Send. People believe what they clicked themselves.
 
@@ -34,7 +34,7 @@ Times are cumulative. Lines in quotes are suggestions; say them in your own word
 > "Quick question: have you ever had to cold-email someone to win a client or a partner?"
 
 Whatever they say, connect it:
-> "Then you know the drill. I run outreach for BEACN, a student consulting club at Berkeley. For every company we pitch, I'd spend [Adam: real time] on LinkedIn, the company's site, an email finder, a spreadsheet, and a mail merge. We send [Adam: real number] of these a semester."
+> "Then you know the drill. I run outreach for BEACN, a student consulting club at Berkeley. Preparing outreach to one company took me more than an hour, bouncing between Apollo, spreadsheets, Claude, and GMass. Jiwoo and I built Envoy to collapse that into one flow."
 
 Optionally show the real Lightship email you sent (on your phone) as the proof this is your problem.
 
@@ -46,7 +46,11 @@ Optionally show the real Lightship email you sent (on your phone) as the proof t
 
 **Driver:** switch to Tab 3, slide the laptop over.
 
-> "Let's do one for you. What kind of company would *you* want to reach? Industry, city, anything."
+> "Let's do one for you. Are you looking for clients, or partners?"
+
+**Judge does:** picks **Pitching a client** or **Proposing a partnership**.
+
+> "And what kind of company would you want to reach? Industry, city, anything."
 
 **Judge does:** types their goal, clicks **Find organizations**.
 
@@ -69,7 +73,7 @@ Then click **Research** on their list as soon as it appears, and move on to Tab 
    > "It also tells you what it couldn't verify, instead of making it up."
 
 3. **People.** Scroll to "Who to write to".
-   > "About ten people per company, several per role. We only pay to look up an email when you actually want that person."
+   > "Up to ten people per company, several per role. Most emails are only looked up when you pick someone, so you aren't paying for people you'll never write to."
 
    **Judge does:** clicks **Select all with email**, or **Find email** on one person.
 
@@ -101,14 +105,14 @@ If anything fails, switch to the demo tab without comment and keep going.
 
 Keep it to three sentences; offer more only if they lean in.
 
-> "An agent searches the web for organizations and people. Claude writes a brief from the pages it read, and then our code checks every citation against those pages and has a second pass fact-check each claim; anything it can't back up is downgraded or listed as unknown. Email lookups only run for people you pick, so a company costs about five cents."
+> "An agent searches the web for organizations and people. Claude writes a brief from the pages it read, and then our code checks every citation against those pages and has a second pass fact-check each claim; anything it can't back up is downgraded or listed as unknown. Most email lookups wait until you pick someone; on our measured run, a company came to about five cents."
 
 Point at the spend line at the top of the campaign:
-> "That's what this campaign actually cost."
+> "That's what this campaign actually cost, tracked per service."
 
 ### 3:45 to 4:05, impact and what's next
 
-> "We built this for people who live on outreach and do it by hand: student consulting clubs first, then small agencies and founders. Apollo and Clay give you lists; they don't give you a reason to write that you can verify. Next we're [Adam: confirm the plan, e.g. putting it in front of other Berkeley clubs this semester] and adding a second email finder for the people Hunter misses."
+> "We built this for people who live on outreach and do it by hand: student consulting clubs first, then small agencies and founders. Apollo and Clay give you lists; they don't give you a reason to write that you can verify. Next: interviews with three to five outreach-heavy teams and two named testers, measuring time saved and how much people edit the drafts, and switching email lookups to Anymail Finder."
 
 Close with a question, not a statement:
 > "Who would you send this to first?"
@@ -126,13 +130,16 @@ Every claim must cite one of the pages Envoy read, and our code checks each cita
 The opposite by design: a human approves every email, it sends from your own Gmail one at a time with a daily cap (30 by default), no tracking pixels, an opt-out line in every footer, and anyone already contacted is skipped. It's built for 10 good emails, not 10,000.
 
 **"What does it cost to run?"**
-Measured on a real campaign: about $0.005 of Claude, $0.018 of Exa search, and one Hunter lookup per company, about five cents total. A club could pay $15 to $49 a month and we'd keep over 90% margin.
+On one measured five-company run: about $0.005 of Claude, $0.018 of Exa search, and one Hunter lookup per company, about five cents total. Treat that as an estimate, not a guarantee. Proposed launch pricing is two tiers: **Free**, ad-supported with limited research credits, and **Business**, ad-free at $29 a month with 200+ research credits. A research credit is one completed company profile plus a personalized draft.
 
 **"How is this different from Apollo, Clay, or Instantly?"**
 They're databases and sequencers for sales teams. Envoy starts from a goal, explains why each organization fits with sources, and writes in your own voice. It's a research assistant that sends, not a list you blast.
 
 **"Where does the data come from? Is it legal?"**
 Company research is from public web pages via Exa; people and emails come from Hunter, which compiles publicly listed professional addresses. We only request permission to *send* Gmail, never to read it.
+
+**"Is the fit score a probability?"**
+No. It's a rough ranking heuristic. The criteria marked Supported, Not met, or Unknown, each with sources, are what to trust.
 
 **"What did you learn from using it yourselves?"**
 Three things changed the product: we email about ten people per company, not one; every draft needs a human edit, so drafts are editable; and the setup had to make your own details obvious, so they're highlighted as they fill in.
@@ -144,7 +151,8 @@ Keeping the writing grounded. Structured output with evidence IDs the model can 
 
 - **Live run is slow:** keep talking through Tab 2; come back to the judge's run at the end, or skip it.
 - **Live run errors or Wi-Fi drops:** switch to the demo window: "Here's the same flow on our sample data."
-- **Judge wants a goal outside the sample companies in the demo:** be upfront: "The demo uses six sample companies; the live version searches the whole web, and here's one we ran this morning."
+- **Judge wants a goal outside the sample companies in the demo:** be upfront: "The demo uses six fictional sample companies and simulated sending; the live version searches the whole web, and here's one we ran this morning."
+- **Two judges on the demo at once:** the demo account is shared and resets on each "Try the demo", so run it from one laptop only.
 - **Out of Hunter lookups:** run judges' goals on the demo for the rest of the round.
 
 ## After each judge
