@@ -11,8 +11,21 @@ export async function api<T = unknown>(path: string, init?: RequestInit & { json
     body: init?.json !== undefined ? JSON.stringify(init.json) : init?.body,
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new ApiError(res.status, data?.error || `Request failed (${res.status})`);
+  let data: { error?: string } | null = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    // Hosting errors (for example Vercel's 4.5 MB request limit) come back as plain text, not JSON.
+  }
+  if (!res.ok) {
+    const fallback =
+      res.status === 413
+        ? "That upload is too large to save. Use a PDF under 3 MB."
+        : res.status === 401
+          ? "You've been signed out. Sign in again, then save."
+          : `Something went wrong (${res.status}). Try again.`;
+    throw new ApiError(res.status, data?.error || fallback);
+  }
   return data as T;
 }
 

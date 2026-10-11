@@ -61,7 +61,8 @@ export const GET = handle(async () => {
 export const PUT = handle(async (req: Request) => {
   const u = await requireUser();
   const b = In.parse(await req.json());
-  if (b.deck && b.deck.base64.length > 14_000_000) throw new Error("The deck is larger than 10 MB. Export a smaller PDF.");
+  // About 3 MB of PDF once base64-encoded; the hosting platform rejects request bodies over 4.5 MB.
+  if (b.deck && b.deck.base64.length > 4_300_000) throw new Error("The deck is larger than 3 MB. Export a compressed PDF and try again.");
   if (b.logo && !/^data:image\/(png|jpeg|gif|webp);base64,/.test(b.logo)) throw new Error("The logo must be a PNG, JPG, GIF, or WebP image.");
   const db = await getDb();
   const values = {

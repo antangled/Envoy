@@ -55,6 +55,8 @@ export default function SetupPage() {
   const [exclusions, setExclusions] = useState<{ value: string; source: string }[]>([]);
   const [exclText, setExclText] = useState("");
   const [cap, setCap] = useState(30);
+  const [savedCap, setSavedCap] = useState(30);
+  const [barMsg, setBarMsg] = useState<{ tone: "ok" | "bad" | "warn"; text: string } | null>(null);
   const [filling, setFilling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "bad" | "warn"; text: string } | null>(null);
@@ -74,12 +76,16 @@ export default function SetupPage() {
         setSaved(JSON.stringify(d.profile));
         setExclusions(d.exclusions);
         setCap(d.dailyCap);
+        setSavedCap(d.dailyCap);
         setEmail(d.email);
       })
       .catch(() => router.replace("/"));
   }, [router]);
 
-  const set = <K extends keyof Profile>(k: K, v: Profile[K]) => setP((x) => (x ? { ...x, [k]: v } : x));
+  const set = <K extends keyof Profile>(k: K, v: Profile[K]) => {
+    setBarMsg(null); // an old "Saved" or warning no longer describes the page once it's edited
+    setP((x) => (x ? { ...x, [k]: v } : x));
+  };
   const templateKey = mode === "client" ? "templateClient" : "templatePartnership";
 
   const sig: Signature | null = useMemo(
@@ -100,13 +106,24 @@ export default function SetupPage() {
     [p],
   );
 
+  // Warn before leaving the page with edits that haven't been saved.
+  const unsaved = !!p && (saved !== JSON.stringify(p) || !!deck || removeDeck || !!exclText || cap !== savedCap);
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
+
   if (!p || !sig) return <p className="text-ink-2">Loading…</p>;
 
   const body = p[templateKey];
   const unfilled = unfilledPlaceholders(`${p.subjectTemplate}\n${body}`);
   const unknown = unknownTokens(`${p.subjectTemplate}\n${body}`);
   const ai = usesAi(body);
-  const dirty = saved !== JSON.stringify(p) || !!deck || removeDeck || !!exclText;
+  const dirty = unsaved;
+  // Campaigns need your name and organization; say exactly what's missing instead of hiding the way forward.
+  const missing = [!p.meName.trim() && "your name", !p.orgName.trim() && "your organization"].filter(Boolean) as string[];
   const detailsDone = !!(p.meName && p.meRole && p.orgName);
   const emailDone = !unfilledPlaceholders(`${p.subjectTemplate}\n${p.templateClient}`).length && !unknown.length;
   const gmail = !!status?.user?.gmailConnected;
@@ -131,10 +148,11 @@ export default function SetupPage() {
     }
   }
 
-  async function save() {
-    if (!p) return;
+  async function save(): Promise<boolean> {
+    if (!p) return false;
     setSaving(true);
     setMsg(null);
+    setBarMsg(null);
     try {
       await api("/api/setup", { method: "PUT", json: { ...p, deck, removeDeck, exclusionsText: exclText, dailyCap: cap } });
       const d = await api<{ profile: Profile; exclusions: { value: string; source: string }[] }>("/api/setup");
@@ -144,13 +162,26 @@ export default function SetupPage() {
       setExclText("");
       setDeck(null);
       setRemoveDeck(false);
+      setSavedCap(cap);
       await refresh();
-      setMsg({ tone: "ok", text: "Saved." });
+      setBarMsg({ tone: "ok", text: "Saved." });
+      return true;
     } catch (e) {
-      setMsg({ tone: "bad", text: (e as Error).message });
+      setBarMsg({ tone: "bad", text: `Not saved: ${(e as Error).message}` });
+      return false;
     } finally {
       setSaving(false);
     }
+  }
+
+  async function continueToCampaigns() {
+    if (missing.length) {
+      setBarMsg({ tone: "warn", text: `Add ${missing.join(" and ")} in Your details first.` });
+      document.getElementById(!p?.meName.trim() ? "meName" : "orgName")?.focus();
+      return;
+    }
+    if (dirty && !(await save())) return;
+    router.push("/campaigns");
   }
 
   async function sendTest() {
@@ -258,7 +289,18 @@ export default function SetupPage() {
             <p className="mt-2 text-[14px] text-ink-2">Attached to each email when a campaign is set to attach it. Envoy can also read it to write your email.</p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <input id="deck" type="file" accept="application/pdf" className="max-w-full text-[13px] file:mr-3 file:rounded-md file:border file:border-rule file:bg-surface file:px-3 file:py-1 file:text-[13px] file:font-semibold file:text-ink"
-                onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setDeck({ name: f.name, base64: await fileToBase64(f) }); setRemoveDeck(false); } }} />
+                onChange={async (e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  // The live site can't accept uploads over about 4 MB once encoded, so stop large decks here with a clear reason.
+                  if (f.size > 3 * 1024 * 1024) {
+                    e.target.value = "";
+                    setBarMsg({ tone: "bad", text: `${f.name} is ${(f.size / 1048576).toFixed(1)} MB. Decks must be under 3 MB. Export a compressed PDF and try again.` });
+                    return;
+                  }
+                  setDeck({ name: f.name, base64: await fileToBase64(f) });
+                  setRemoveDeck(false);
+                }} />
               {p.deckName && !removeDeck && <button type="button" className="text-[13px] text-link hover:underline" onClick={() => setRemoveDeck(true)}>Remove {p.deckName}</button>}
             </div>
           </details>
@@ -309,9 +351,11 @@ export default function SetupPage() {
       </div>
 
       <div className="sticky bottom-0 -mx-5 mt-10 flex flex-wrap items-center gap-3 border-t border-rule bg-canvas/95 px-5 py-4 backdrop-blur">
-        <Button onClick={save} busy={saving} disabled={!dirty && p.saved}>{dirty || !p.saved ? "Save" : "Saved"}</Button>
-        {status?.profileComplete && !dirty && <Button variant="quiet" onClick={() => router.push("/campaigns/new")}>Start a campaign</Button>}
-        {dirty && <span className="text-[13px] text-ink-2">Unsaved changes</span>}
+        <Button variant="quiet" onClick={save} busy={saving} disabled={!dirty && p.saved}>{dirty || !p.saved ? "Save" : "Saved"}</Button>
+        <Button onClick={continueToCampaigns} disabled={saving}>{dirty ? "Save and go to campaigns" : "Go to campaigns"}</Button>
+        <span role="status" className={`text-[13px] ${barMsg?.tone === "bad" ? "text-bad" : barMsg?.tone === "warn" ? "text-warn" : barMsg ? "text-ok" : "text-ink-2"}`}>
+          {barMsg ? barMsg.text : dirty ? "Unsaved changes" : missing.length ? `Add ${missing.join(" and ")} to start a campaign.` : "All changes saved."}
+        </span>
       </div>
     </>
   );
