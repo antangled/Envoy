@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { eq } from "drizzle-orm";
-import { authSecret } from "./env";
+import { authSecret, demoOnly } from "./env";
 import { getDb, schema } from "@/db";
 
 const COOKIE = "envoy_session";
@@ -34,6 +34,8 @@ export async function currentUser() {
     const { payload } = await jwtVerify(token, secret());
     const db = await getDb();
     const [u] = await db.select().from(schema.users).where(eq(schema.users.id, Number(payload.uid)));
+    // On a demo-only deployment, real accounts are treated as signed out so nothing can spend API credits.
+    if (u && demoOnly() && !u.isDemo) return null;
     return u ?? null;
   } catch {
     return null;

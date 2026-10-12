@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import { decodeJwt } from "jose";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { appUrl, secret } from "@/lib/env";
+import { appUrl, demoOnly, secret } from "@/lib/env";
 import { encrypt } from "@/lib/crypto";
 import { createSession } from "@/lib/session";
 
 export async function GET(req: Request) {
+  if (demoOnly()) redirect("/?error=demo_only");
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");

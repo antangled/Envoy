@@ -1,11 +1,12 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { appUrl, secret } from "@/lib/env";
+import { appUrl, demoOnly, secret } from "@/lib/env";
 
 const SCOPES = ["openid", "email", "profile", "https://www.googleapis.com/auth/gmail.send"];
 
 export async function GET(req: Request) {
+  if (demoOnly()) redirect("/?error=demo_only");
   // Google returns to APP_URL, so sign-in has to start there too or the state cookie lands on the wrong host
   // (Vercel serves the same app on several addresses).
   const here = new URL(req.url);

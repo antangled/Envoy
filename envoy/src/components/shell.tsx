@@ -57,12 +57,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
             )}
             {user && (
               <>
-                <span className="hidden items-center gap-2 sm:flex">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-brand text-[11px] font-semibold text-on-seal" aria-hidden>
-                    {user.email.slice(0, 1).toUpperCase()}
+                {user.isDemo ? (
+                  <span className="rounded-full border border-rule bg-sunken px-2.5 py-0.5 font-semibold text-ink-2" title="Sample companies and people. Nothing is sent.">
+                    Demo · sample data
                   </span>
-                  {user.email}
-                </span>
+                ) : (
+                  <span className="hidden items-center gap-2 sm:flex">
+                    <span className="grid h-6 w-6 place-items-center rounded-full bg-brand text-[11px] font-semibold text-on-seal" aria-hidden>
+                      {user.email.slice(0, 1).toUpperCase()}
+                    </span>
+                    {user.email}
+                  </span>
+                )}
                 <span className="hidden h-4 w-px bg-rule sm:block" aria-hidden />
                 <button
                   className="rounded-md px-1.5 py-1 font-medium text-ink-2 hover:text-ink"
@@ -72,7 +78,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                     router.push("/");
                   }}
                 >
-                  Sign out
+                  {user.isDemo ? "Exit demo" : "Sign out"}
                 </button>
               </>
             )}

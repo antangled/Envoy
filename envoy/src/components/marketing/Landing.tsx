@@ -14,6 +14,7 @@ const ERRORS: Record<string, string> = {
   access_denied: "Google sign-in was cancelled.",
   gmail_permission_not_granted: "Envoy needs permission to send email on your behalf. Sign in again and leave the Gmail box checked.",
   state_mismatch: "Sign-in expired. Try again.",
+  demo_only: "Sign-in is closed on this site for now. Try the demo: it runs the full flow on sample data and sends nothing.",
 };
 
 /** Sign-in actions, shared by the nav, the hero, and the closing band. Signed-in visitors get a way back into the app. */
@@ -118,15 +119,17 @@ function MarketingNav() {
             </Link>
           ) : (
           <>
-          <button type="button" onClick={demo} disabled={busy} className="hidden h-9 rounded-lg px-3 text-[14px] font-medium text-ink-2 transition-colors hover:text-ink sm:block">
-            Try the demo
-          </button>
+          {google && (
+            <button type="button" onClick={demo} disabled={busy} className="hidden h-9 rounded-lg px-3 text-[14px] font-medium text-ink-2 transition-colors hover:text-ink sm:block">
+              Try the demo
+            </button>
+          )}
           {google ? (
             <a href="/api/auth/google" className="inline-flex h-9 items-center rounded-lg bg-ink px-3.5 text-[14px] font-semibold text-canvas transition-colors hover:bg-ink/88">
               Sign in
             </a>
           ) : (
-            <button type="button" onClick={demo} disabled={busy} className="inline-flex h-9 items-center rounded-lg bg-ink px-3.5 text-[14px] font-semibold text-canvas transition-colors hover:bg-ink/88 sm:hidden">
+            <button type="button" onClick={demo} disabled={busy} className="inline-flex h-9 items-center rounded-lg bg-ink px-3.5 text-[14px] font-semibold text-canvas transition-colors hover:bg-ink/88">
               Try the demo
             </button>
           )}
@@ -135,6 +138,17 @@ function MarketingNav() {
         </div>
       </div>
     </header>
+  );
+}
+
+function ClosingNote() {
+  const { google } = useSignIn();
+  return (
+    <p className="mt-5 max-w-[50ch] text-[16.5px] leading-relaxed text-on-brand-2">
+      {google
+        ? "Try the demo with sample data, or sign in with Google to send from your own address."
+        : "The demo runs the whole flow on sample companies, with no sign-up. Nothing is sent."}
+    </p>
   );
 }
 
@@ -329,7 +343,7 @@ function Landing() {
             <h2 className="max-w-[20ch] text-balance font-serif text-[clamp(2rem,1.3rem+2.6vw,3.25rem)] font-medium leading-[1.08] tracking-[-0.022em]">
               Write to the right person, with a reason they&rsquo;ll recognize.
             </h2>
-            <p className="mt-5 max-w-[50ch] text-[16.5px] leading-relaxed text-on-brand-2">Try the demo with sample data, or sign in with Google to send from your own address.</p>
+            <ClosingNote />
             <div className="mt-8">
               <Actions onBrand />
             </div>

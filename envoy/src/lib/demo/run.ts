@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, lt } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Progress } from "@/lib/pipeline/research";
 import { renderDraft, upsertDraft } from "@/lib/pipeline/draft";
@@ -20,8 +20,8 @@ export const isScriptedDemo = (u: Pick<User, "isDemo"> | null | undefined) => !!
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Each "Try the demo" starts fresh: the demo account's campaigns, sends, and exclusions are cleared and the sample profile is restored. */
-export async function resetDemo(userId: number) {
+/** Deletes everything a demo account created: campaigns, prospects, briefs, contacts, drafts, sends, exclusions. */
+async function purgeDemoData(userId: number) {
   const db = await getDb();
   const cs = await db.select({ id: schema.campaigns.id }).from(schema.campaigns).where(eq(schema.campaigns.userId, userId));
   const cIds = cs.map((c) => c.id);
@@ -39,6 +39,12 @@ export async function resetDemo(userId: number) {
   }
   await db.delete(schema.exclusions).where(eq(schema.exclusions.userId, userId));
   await db.delete(schema.suppressions).where(eq(schema.suppressions.userId, userId));
+}
+
+/** Each "Try the demo" starts fresh: the visitor's own demo data is cleared and the sample profile is restored. */
+export async function resetDemo(userId: number) {
+  const db = await getDb();
+  await purgeDemoData(userId);
   const values = {
     ...BEACN_PROFILE,
     // The demo has no deck uploaded, so the email shouldn't promise one.
@@ -52,6 +58,30 @@ export async function resetDemo(userId: number) {
     updatedAt: new Date(),
   };
   await db.insert(schema.orgProfiles).values({ userId, ...values }).onConflictDoUpdate({ target: schema.orgProfiles.userId, set: values });
+}
+
+/**
+ * Every visitor gets a private demo account, so many people can try the demo at once without resetting each other.
+ * Demo accounts older than two days are removed along with everything they created.
+ */
+export async function newDemoUser() {
+  const db = await getDb();
+  const [u] = await db.insert(schema.users).values({ email: `demo-${crypto.randomUUID()}@envoy.local`, isDemo: true }).returning();
+  return u;
+}
+
+export async function cleanupOldDemos() {
+  const db = await getDb();
+  const old = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(and(eq(schema.users.isDemo, true), lt(schema.users.createdAt, new Date(Date.now() - 2 * 864e5))))
+    .limit(25);
+  for (const { id } of old) {
+    await purgeDemoData(id);
+    await db.delete(schema.orgProfiles).where(eq(schema.orgProfiles.userId, id));
+    await db.delete(schema.users).where(eq(schema.users.id, id));
+  }
 }
 
 /** Finding organizations: a short wait so the progress screen plays, then the sample list. */
