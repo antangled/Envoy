@@ -22,9 +22,11 @@ function useSignIn() {
   const { status, refresh } = useStatus();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  const google = !!status?.integrations.google;
+  // On the demo-only public site, Google sign-in is only for BEACN members, so the landing page doesn't offer it.
+  const google = !!status?.integrations.google && !status?.demoOnly;
+  const memberLink = !!status?.demoOnly && !!status?.integrations.google;
   const signedIn = !!status?.user;
-  const appHref = status?.profileComplete ? "/campaigns" : "/setup";
+  const appHref = status?.user && !status.user.campaigns ? "/beacn" : status?.profileComplete ? "/campaigns" : "/setup";
   const demo = async () => {
     setBusy(true);
     try {
@@ -35,7 +37,7 @@ function useSignIn() {
       setBusy(false);
     }
   };
-  return { google, busy, demo, signedIn, appHref };
+  return { google, busy, demo, signedIn, appHref, memberLink };
 }
 
 const btn = "inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-[14.5px] font-semibold transition-colors duration-150 disabled:opacity-60";
@@ -139,6 +141,15 @@ function MarketingNav() {
       </div>
     </header>
   );
+}
+
+function FooterMemberLink() {
+  const { memberLink } = useSignIn();
+  return memberLink ? (
+    <a href="/beacn" className="text-link hover:underline">
+      BEACN member sign-in
+    </a>
+  ) : null;
 }
 
 function ClosingNote() {
@@ -356,6 +367,7 @@ function Landing() {
           <Logo />
           <span>Nothing sends without your approval.</span>
           <span className="sm:ml-auto">Companies and people shown on this page are fictional examples.</span>
+          <FooterMemberLink />
         </div>
       </footer>
     </div>

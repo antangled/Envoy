@@ -29,6 +29,13 @@
       "when": 1791683597971,
       "tag": "0003_usage_and_recipients",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792356368854,
+      "tag": "0004_beacn_outreach",
+      "breakpoints": true
     }
   ]
 }

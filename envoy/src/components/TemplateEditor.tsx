@@ -6,7 +6,8 @@ import { AI_BLOCKS, MY_FIELDS, VARIABLES, tokenize } from "@/lib/template/render
  * A plain textarea with a highlight layer behind it: the user edits the whole email as one piece of text,
  * while variables, generated sections, and unfilled placeholders are colored in place.
  */
-export function TemplateEditor({ id, value, onChange, minRows = 12, label }: { id: string; value: string; onChange: (v: string) => void; minRows?: number; label: string }) {
+/** `ai={false}` hides the AI section buttons, for tools where only your own words and the merge fields are allowed. */
+export function TemplateEditor({ id, value, onChange, minRows = 12, label, ai = true }: { id: string; value: string; onChange: (v: string) => void; minRows?: number; label: string; ai?: boolean }) {
   const ta = useRef<HTMLTextAreaElement>(null);
 
   // Grow with the content so the whole email is always visible without an inner scrollbar.
@@ -47,8 +48,8 @@ export function TemplateEditor({ id, value, onChange, minRows = 12, label }: { i
             {v.label}
           </button>
         ))}
-        <span className="mx-0.5 h-4 w-px bg-rule" aria-hidden />
-        {AI_BLOCKS.map((v) => (
+        {ai && <span className="mx-0.5 h-4 w-px bg-rule" aria-hidden />}
+        {ai && AI_BLOCKS.map((v) => (
           <button key={v.token} type="button" title={v.help} onClick={() => insert(v.token, v.token === "{{ai_ideas}}")} className="rounded-md bg-carbon px-2 py-0.5 text-[12px] font-semibold text-link hover:brightness-95">
             ✦ {v.label}
           </button>

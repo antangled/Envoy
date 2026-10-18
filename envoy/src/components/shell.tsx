@@ -6,11 +6,12 @@ import { api } from "@/lib/client/api";
 import { Logo } from "./Logo";
 import { ThemeToggle } from "./ThemeToggle";
 
-const NAV = [
+const ENVOY_NAV = [
   { href: "/campaigns", label: "Campaigns" },
   { href: "/history", label: "Sent" },
   { href: "/setup", label: "Setup" },
 ];
+const BEACN_NAV = { href: "/beacn", label: "BEACN Outreach" };
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const { status, refresh } = useStatus();
@@ -33,7 +34,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </Link>
           {user && (
             <nav className="flex gap-0.5" aria-label="Main">
-              {NAV.map((n) => {
+              {[...(user.campaigns ? ENVOY_NAV : []), ...(!user.isDemo && (user.beacnMember || !user.campaigns) ? [BEACN_NAV] : [])].map((n) => {
                 const active = path.startsWith(n.href);
                 return (
                   <Link

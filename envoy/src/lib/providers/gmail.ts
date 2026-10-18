@@ -2,8 +2,12 @@ import "server-only";
 import crypto from "node:crypto";
 import { secret } from "@/lib/env";
 
+// Overridable only so the end-to-end tests can point at the local mock server.
+const TOKEN_URL = () => process.env.GOOGLE_TOKEN_URL || "https://oauth2.googleapis.com/token";
+const GMAIL_BASE = () => process.env.GMAIL_BASE_URL || "https://gmail.googleapis.com";
+
 export async function accessTokenFromRefresh(refreshToken: string): Promise<string> {
-  const res = await fetch("https://oauth2.googleapis.com/token", {
+  const res = await fetch(TOKEN_URL(), {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
@@ -80,7 +84,7 @@ export function logoPart(dataUri: string | null | undefined) {
 }
 
 export async function sendGmail(accessToken: string, raw: string): Promise<string> {
-  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+  const res = await fetch(`${GMAIL_BASE()}/gmail/v1/users/me/messages/send`, {
     method: "POST",
     headers: { authorization: `Bearer ${accessToken}`, "content-type": "application/json" },
     body: JSON.stringify({ raw }),

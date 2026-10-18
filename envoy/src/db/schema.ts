@@ -8,6 +8,9 @@ export const users = pgTable("users", {
   googleRefreshTokenEnc: text("google_refresh_token_enc"),
   dailyCap: integer("daily_cap").notNull().default(30),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  /** Entered the BEACN club key with an @berkeley.edu account; unlocks the BEACN outreach tool. */
+  beacnMember: boolean("beacn_member").notNull().default(false),
+  beacnJoinedAt: timestamp("beacn_joined_at", { withTimezone: true }),
 });
 
 export const orgProfiles = pgTable("org_profiles", {
@@ -184,3 +187,98 @@ export const hunterCache = pgTable("hunter_cache", {
   data: jsonb("data").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------- BEACN outreach (Apollo contacts + template sending)
+
+/** A member's sender details and email template. The organization line comes from the club settings. */
+export const beacnProfiles = pgTable("beacn_profiles", {
+  userId: integer("user_id").primaryKey(),
+  name: text("name").notNull().default(""),
+  pronouns: text("pronouns").notNull().default(""),
+  title: text("title").notNull().default(""),
+  phone: text("phone").notNull().default(""),
+  signoff: text("signoff").notNull().default("Best,"),
+  subject: text("subject").notNull().default(""),
+  body: text("body").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Every company anyone on the committee has found, so later searches are free. */
+export const beacnCompanies = pgTable("beacn_companies", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  domain: text("domain").notNull().unique(),
+  apolloOrgId: text("apollo_org_id"),
+  logoUrl: text("logo_url"),
+  linkedinUrl: text("linkedin_url"),
+  createdBy: integer("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Apollo company-search results by normalized query; each new query costs 1 credit, repeats are free. */
+export const beacnCompanySearches = pgTable("beacn_company_searches", {
+  query: text("query").primaryKey(),
+  results: jsonb("results").$type<{ name: string; domain: string; apolloOrgId: string | null; logoUrl: string | null; linkedinUrl: string | null }[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** People from Apollo search (free). Emails are filled only after a paid lookup and then shared with every member. */
+export const beacnPeople = pgTable(
+  "beacn_people",
+  {
+    id: serial("id").primaryKey(),
+    apolloId: text("apollo_id").notNull().unique(),
+    domain: text("domain").notNull(),
+    companyName: text("company_name").notNull().default(""),
+    firstName: text("first_name").notNull().default(""),
+    lastNameObfuscated: text("last_name_obfuscated").notNull().default(""),
+    lastName: text("last_name"),
+    title: text("title"),
+    linkedinUrl: text("linkedin_url"),
+    email: text("email"),
+    emailStatus: text("email_status"),
+    /** Set while a lookup is running so two members never pay for the same person. */
+    lookupStartedAt: timestamp("lookup_started_at", { withTimezone: true }),
+    lookedUpAt: timestamp("looked_up_at", { withTimezone: true }),
+    lookedUpBy: integer("looked_up_by"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("beacn_people_domain").on(t.domain)],
+);
+
+/** Every credit spent (and every key attempt), for limits and the admin log. */
+export const beacnLedger = pgTable(
+  "beacn_ledger",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    kind: text("kind").$type<"company_search" | "email_lookup" | "key_attempt">().notNull(),
+    credits: integer("credits").notNull().default(0),
+    detail: jsonb("detail").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("beacn_ledger_user_time").on(t.userId, t.createdAt)],
+);
+
+export const beacnSends = pgTable(
+  "beacn_sends",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id").notNull(),
+    batchId: text("batch_id").notNull(),
+    personId: integer("person_id"),
+    toEmail: text("to_email").notNull(),
+    toName: text("to_name"),
+    company: text("company").notNull(),
+    domain: text("domain").notNull(),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }).notNull(),
+    status: text("status").$type<"scheduled" | "sending" | "sent" | "failed" | "cancelled">().notNull().default("scheduled"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    error: text("error"),
+    gmailMessageId: text("gmail_message_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("beacn_sends_domain").on(t.domain), index("beacn_sends_due").on(t.status, t.scheduledAt)],
+);

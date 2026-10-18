@@ -15,14 +15,23 @@ export function secret(name: string): string | undefined {
 const state = (...names: string[]) =>
   names.every((n) => secret(n)) ? "live" : names.some((n) => process.env[n]?.trim()) ? "placeholder" : "missing";
 
-/** Public demo deployments set ENVOY_DEMO_ONLY=1: Google sign-in is off and only scripted demo accounts can use the app. */
+/**
+ * Public demo deployments set ENVOY_DEMO_ONLY=1. Anyone can use the scripted demo; Google sign-in stays on for
+ * BEACN members, but Envoy's AI campaigns (which spend Claude, Exa, and Hunter credits) are limited to admins.
+ */
 export const demoOnly = () => process.env.ENVOY_DEMO_ONLY === "1";
+
+/** BEACN_ADMIN_EMAILS: comma-separated Google accounts that can manage the BEACN tool and use AI campaigns. */
+export const adminEmails = () => (process.env.BEACN_ADMIN_EMAILS || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+export const isAdminEmail = (email: string) => adminEmails().includes(email.toLowerCase());
+/** Who may run Envoy's AI campaigns: everyone normally; on a demo-only deployment, demo accounts and admins only. */
+export const campaignsAllowed = (u: { isDemo: boolean; email: string }) => !demoOnly() || u.isDemo || isAdminEmail(u.email);
 
 export const integrations = () => ({
   anthropic: !!secret("ANTHROPIC_API_KEY"),
   exa: !!secret("EXA_API_KEY"),
   hunter: !!secret("HUNTER_API_KEY"),
-  google: !demoOnly() && !!(secret("GOOGLE_CLIENT_ID") && secret("GOOGLE_CLIENT_SECRET")),
+  google: !!(secret("GOOGLE_CLIENT_ID") && secret("GOOGLE_CLIENT_SECRET")),
   database: !!secret("DATABASE_URL"),
 });
 

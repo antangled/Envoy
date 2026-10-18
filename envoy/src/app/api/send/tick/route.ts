@@ -1,4 +1,5 @@
 import { processDue } from "@/lib/pipeline/send";
+import { deliverDue } from "@/lib/beacn/send";
 
 export const maxDuration = 60;
 
@@ -6,5 +7,7 @@ export const maxDuration = 60;
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) return Response.json({ error: "Unauthorized" }, { status: 401 });
-  return Response.json(await processDue());
+  // Also a daily safety net for BEACN emails whose scheduled QStash delivery didn't arrive.
+  const beacn = await deliverDue();
+  return Response.json({ ...(await processDue()), beacn });
 }

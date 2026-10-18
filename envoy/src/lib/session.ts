@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { eq } from "drizzle-orm";
-import { authSecret, demoOnly } from "./env";
+import { authSecret, campaignsAllowed } from "./env";
 import { getDb, schema } from "@/db";
 
 const COOKIE = "envoy_session";
@@ -34,8 +34,6 @@ export async function currentUser() {
     const { payload } = await jwtVerify(token, secret());
     const db = await getDb();
     const [u] = await db.select().from(schema.users).where(eq(schema.users.id, Number(payload.uid)));
-    // On a demo-only deployment, real accounts are treated as signed out so nothing can spend API credits.
-    if (u && demoOnly() && !u.isDemo) return null;
     return u ?? null;
   } catch {
     return null;
@@ -48,9 +46,17 @@ export class HttpError extends Error {
   }
 }
 
-export async function requireUser() {
+/** Any signed-in account. Used by the BEACN tool, which does its own membership check. */
+export async function requireAnyUser() {
   const u = await currentUser();
   if (!u) throw new HttpError(401, "Sign in to continue.");
+  return u;
+}
+
+/** Envoy campaign routes. On a demo-only deployment only demo accounts and admins get through, so no one else can spend AI credits. */
+export async function requireUser() {
+  const u = await requireAnyUser();
+  if (!campaignsAllowed(u)) throw new HttpError(403, "Envoy campaigns aren't open on this site yet. Try the demo, or use BEACN Outreach if you're a member.");
   return u;
 }
 

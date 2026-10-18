@@ -124,5 +124,42 @@ http.createServer(async (req, res) => {
   }
   if (req.method === "POST" && url.pathname === "/contents") { const b = await readBody(req); log.push({ api: "exa", path: "/contents", n: b.urls?.length }); return send(res, 200, { results: [] }); }
   if (req.method === "GET" && url.pathname.startsWith("/v2/")) return send(res, 200, hunter(url.pathname, url.searchParams));
+  // Apollo (BEACN Outreach): company search costs 1 credit, people search is free, bulk_match charges per email found.
+  if (req.method === "POST" && url.pathname === "/api/v1/mixed_companies/search") {
+    const q = (url.searchParams.get("q_organization_name") || "").toLowerCase();
+    log.push({ api: "apollo", path: "companies", q });
+    const all = [
+      { id: "org1", name: "Northwind Robotics", primary_domain: "northwind.example", logo_url: null, linkedin_url: null },
+      { id: "org2", name: "Northwind Traders", primary_domain: "northwindtraders.example", logo_url: null, linkedin_url: null },
+    ];
+    return send(res, 200, { organizations: all.filter((o) => o.name.toLowerCase().includes(q)) });
+  }
+  if (req.method === "POST" && url.pathname === "/api/v1/mixed_people/api_search") {
+    const domain = url.searchParams.getAll("q_organization_domains_list[]")[0] || "";
+    const page = Number(url.searchParams.get("page") || 1);
+    log.push({ api: "apollo", path: "people", domain, page });
+    const roster = [["Jordan", "Le***e", "VP Operations"], ["Casey", "Mo***n", "Head of Strategy"], ["Taylor", "Ki***m", "Director of Operations"], ["Morgan", "Di***z", "Chief of Staff"]];
+    return send(res, 200, { total_entries: roster.length, people: page > 1 ? [] : roster.map(([f, l, t], i) => ({ id: `${domain}-p${i}`, first_name: f, last_name_obfuscated: l, title: t, has_email: i !== 3, organization: { name: domain.split(".")[0] } })) });
+  }
+  if (req.method === "POST" && url.pathname === "/api/v1/people/bulk_match") {
+    const b = await readBody(req);
+    const last = { p0: "Lee", p1: "Morgan", p2: "Kim", p3: "Diaz" };
+    const matches = (b.details || []).map((d) => {
+      const [domain, k] = String(d.id).split("-");
+      const first = { p0: "Jordan", p1: "Casey", p2: "Taylor", p3: "Morgan" }[k];
+      return { id: d.id, first_name: first, last_name: last[k], title: "Role", linkedin_url: null, email: k === "p3" ? null : `${first.toLowerCase()}.${last[k].toLowerCase()}@${domain}`, email_status: k === "p2" ? "extrapolated" : "verified" };
+    });
+    const credits = matches.filter((m) => m.email).length;
+    log.push({ api: "apollo", path: "bulk_match", n: b.details?.length, credits });
+    return send(res, 200, { status: "success", matches, credits_consumed: credits });
+  }
+  // Google token refresh and Gmail send, so BEACN sending can be tested without a real inbox.
+  if (req.method === "POST" && url.pathname === "/token") return send(res, 200, { access_token: "mock-access", expires_in: 3600 });
+  if (req.method === "POST" && url.pathname === "/gmail/v1/users/me/messages/send") {
+    const b = await readBody(req);
+    const raw = Buffer.from(b.raw || "", "base64url").toString();
+    log.push({ api: "gmail", to: (raw.match(/^To: (.*)$/m) || [])[1], subject: (raw.match(/^Subject: (.*)$/m) || [])[1] });
+    return send(res, 200, { id: `msg-${log.length}` });
+  }
   send(res, 404, { error: "not mocked", path: url.pathname });
 }).listen(4010, () => console.log("mock APIs on :4010"));

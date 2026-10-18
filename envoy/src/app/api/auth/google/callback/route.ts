@@ -3,18 +3,19 @@ import { redirect } from "next/navigation";
 import { decodeJwt } from "jose";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import { appUrl, demoOnly, secret } from "@/lib/env";
+import { appUrl, campaignsAllowed, secret } from "@/lib/env";
 import { encrypt } from "@/lib/crypto";
 import { createSession } from "@/lib/session";
 
 export async function GET(req: Request) {
-  if (demoOnly()) redirect("/?error=demo_only");
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const jar = await cookies();
   const expected = jar.get("envoy_oauth_state")?.value;
+  const next = jar.get("envoy_next")?.value;
   jar.delete("envoy_oauth_state");
+  jar.delete("envoy_next");
   if (url.searchParams.get("error")) redirect(`/?error=${encodeURIComponent(url.searchParams.get("error")!)}`);
   if (!code || !state || state !== expected) redirect("/?error=state_mismatch");
 
@@ -49,6 +50,6 @@ export async function GET(req: Request) {
     id = row.id;
   }
   await createSession(id);
-  void appUrl;
-  redirect("/campaigns");
+  if (next && /^\/[a-z0-9/_-]*$/i.test(next)) redirect(next);
+  redirect(campaignsAllowed({ isDemo: false, email }) ? "/campaigns" : "/beacn");
 }
